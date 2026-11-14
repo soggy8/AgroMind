@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.core.config import REPO_ROOT
 from app.modules.croptwin import service as croptwin
 
-from .indicators.vegetation import Reading, period_end
+from .indicators.vegetation import Reading, parse_item_id, period_end, period_start
 from .indicators.weather import Day, Weather
 from .parameters import GOOD_RELIABILITY
 
@@ -181,8 +181,43 @@ def write_crops(path: Path, rows: Mapping[str, Mapping[int, tuple[int, str, int,
 
 
 @lru_cache(maxsize=1)
-def _greenness() -> dict[str, list[Reading]]:
+def _sample_greenness() -> dict[str, list[Reading]]:
     return {k: sorted(v, key=lambda r: (r.year, r.doy)) for k, v in read_readings(GREENNESS_SAMPLE).items()}
+
+
+def _recent_file(name: str) -> Path | None:
+    p = CACHE / name
+    return p if p.exists() else None
+
+
+@lru_cache(maxsize=8)
+def _parsed(path: str, mtime_ns: int, size: int, kind: str):
+    return read_readings(Path(path)) if kind == "modis" else parse_power_csv(Path(path))
+
+
+def _recent(name: str, kind: str):
+    p = _recent_file(name)
+    if p is None:
+        return None
+    st = p.stat()
+    return _parsed(str(p), st.st_mtime_ns, st.st_size, kind)
+
+
+def _greenness() -> dict[str, list[Reading]]:
+    """The committed sample with any refreshed periods from the cache merged over it."""
+    out = {k: list(v) for k, v in _sample_greenness().items()}
+    recent = _recent("modis_recent.csv", "modis")
+    if recent:
+        for fid, rs in recent.items():
+            have = {(r.year, r.doy, r.satellite): i for i, r in enumerate(out.get(fid, []))}
+            merged = out.setdefault(fid, [])
+            for r in rs:
+                if (r.year, r.doy, r.satellite) in have:
+                    merged[have[(r.year, r.doy, r.satellite)]] = r
+                else:
+                    merged.append(r)
+            merged.sort(key=lambda r: (r.year, r.doy))
+    return out
 
 
 @lru_cache(maxsize=1)
@@ -202,12 +237,21 @@ def load_crops(field_id: str) -> dict[int, str]:
 
 
 @lru_cache(maxsize=1)
-def load_weather() -> Weather:
+def _sample_weather() -> Weather:
     base = parse_power_csv(WEATHER_SAMPLE)
     days = dict(base.days)
     if WEATHER_SAMPLE_2026.exists():
         days.update(parse_power_csv(WEATHER_SAMPLE_2026).days)
     return Weather(days, base.latitude, base.longitude, base.elevation_m, base.source)
+
+
+def load_weather() -> Weather:
+    """The committed sample with any refreshed days from the cache merged over it."""
+    base = _sample_weather()
+    recent = _recent("power_recent.csv", "power")
+    if recent is None:
+        return base
+    return Weather({**base.days, **recent.days}, base.latitude, base.longitude, base.elevation_m, base.source)
 
 
 def has_sample(field_ids: Iterable[str]) -> bool:
@@ -293,7 +337,53 @@ def data_through() -> date:
     return min(last_weather, last_period)
 
 
-# ---------- network (used only by fetch_samples) ----------
+# ---------- refresh for today ----------
+
+def refresh(as_of: date, rings: Mapping[str, Sequence[tuple[float, float]]] | None = None) -> None:
+    """Fetch weather and greenness newer than the samples, up to as_of, and save them under CACHE.
+
+    `rings` are the demo fields' boundaries (lat, lon); the service passes them. Without them each sample
+    field is read at the centre of the sample cell. Raises DataUnavailable when NASA can't be reached.
+    """
+    sample_w, sample_g = _sample_weather(), _sample_greenness()
+    if rings:
+        points = {fid: sample_points(r) for fid, r in rings.items()}
+    else:
+        points = {fid: [(42.03, -93.46)] for fid in sample_g}
+    flat = [p for pts in points.values() for p in pts]
+    centre = (sum(p[0] for p in flat) / len(flat), sum(p[1] for p in flat) / len(flat))
+
+    # Weather: the day after the last sample day through as_of.
+    first = max(sample_w.days) + timedelta(days=1)
+    power_text = fetch_power_csv(sample_w.latitude, sample_w.longitude, first, as_of) if first <= as_of else None
+
+    # Greenness: from the last sampled period start; read only items not already held.
+    held = {(r.year, r.doy, r.satellite) for rs in _greenness().values() for r in rs}
+    last = max((r for rs in sample_g.values() for r in rs[-1:]), key=lambda r: (r.year, r.doy))
+    ids = fetch_item_ids(MODIS, centre[0], centre[1], period_start(last.year, last.doy), as_of)
+    recent = {fid: list(rs) for fid, rs in (_recent("modis_recent.csv", "modis") or {}).items()}
+    new = False
+    for item_id in sorted(set(ids)):
+        year, doy, sat = parse_item_id(item_id)
+        if (year, doy, sat) in held:
+            continue
+        for fid, pts in points.items():
+            vals = [fetch_point(MODIS, item_id, lat, lon, NDVI_ASSETS) for lat, lon in pts]
+            mean, used = field_mean([(v[0], v[1]) if len(v) == 2 else (None, None) for v in vals])
+            recent.setdefault(fid, []).append(
+                Reading(year, doy, None if mean is None else round(mean, 4), sat, used, len(vals)))
+        new = True
+    # Written only once everything was fetched, so an outage part-way leaves the cache as it was.
+    if power_text is not None:
+        CACHE.mkdir(parents=True, exist_ok=True)
+        (CACHE / "power_recent.csv").write_text(power_text.replace("\r\n", "\n"), encoding="utf-8", newline="\n")
+    if new:
+        write_readings(CACHE / "modis_recent.csv", {k: sorted(v, key=lambda r: (r.year, r.doy)) for k, v in recent.items()}, [
+            "# Refreshed from Microsoft Planetary Computer for periods newer than the committed sample.",
+            f"# Collection: {MODIS}. Same method as the sample: five points per field, reliability 0 or 1."])
+
+
+# ---------- network (used only by fetch_samples and refresh) ----------
 
 def _request(service: str, method: str, url: str, **kw) -> httpx.Response:
     last: Exception | None = None

@@ -1,6 +1,7 @@
 """Orchestration: farm, samples and weather in; one FarmHealth out. The only file other modules may import."""
 from __future__ import annotations
 
+import time
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
@@ -11,7 +12,7 @@ from .baselines import normal
 from .explanations import find
 from .indicators.vegetation import Reading, period_end, period_start, visible_from
 from .indicators.weather import WeatherValue, weather_values
-from .parameters import ASSUMPTIONS, DEMO_AS_OF, WEATHER_WINDOW_DAYS
+from .parameters import ASSUMPTIONS, DEMO_AS_OF, PERIOD_DAYS, WEATHER_WINDOW_DAYS
 from .ports import DataUnavailable, FarmInfo, FieldInfo, NotFound
 from .schemas import (Assumption, Crop, Explanation, FarmHealth, FarmRef, FieldHealth, Finding, Indicator,
                       SeasonPoint, Soil, Value)
@@ -36,6 +37,11 @@ _WEATHER = (
     ("tmax_30d", "Daily high, 30-day mean", "°C", "observed", POWER_SOURCE, "tmax_c", "°C"),
     ("et0_30d", "Water demand (ET0)", "mm/day", "modelled", ET0_SOURCE, "et0_mm", "%"),
 )
+
+
+REFRESH_EVERY_SECONDS = 3600
+_last_refresh: float | None = None   # when a refresh was last tried (time.monotonic); tests set it to None
+_last_failed = False                 # whether that attempt could not reach NASA
 
 
 class InvalidDate(ValueError):
@@ -138,6 +144,24 @@ def _field_health(f: FieldInfo, as_of: date, today: date, wvalues: dict[str, Wea
                        season=_season(readings, scored, as_of.year, as_of)), finding
 
 
+def _refresh_if_stale(farm: FarmInfo, as_of: date) -> str | None:
+    """Fetch newer data when as_of runs past the saved data (once an hour at most). Returns an outage note."""
+    global _last_refresh, _last_failed
+    if as_of - ports.data_through() <= timedelta(days=PERIOD_DAYS):
+        return None
+    now = time.monotonic()
+    if _last_refresh is None or now - _last_refresh >= REFRESH_EVERY_SECONDS:
+        _last_refresh = now
+        try:
+            ports.refresh(as_of, {f.id: f.boundary for f in farm.fields})
+            _last_failed = False
+        except DataUnavailable:
+            _last_failed = True
+    if _last_failed and as_of - ports.data_through() > timedelta(days=PERIOD_DAYS):
+        return f"Couldn't reach NASA data. Showing saved data to {_fmt(ports.data_through())}."
+    return None
+
+
 def get_health(session: Session, farm_id: str, as_of: date | None = None, today: date | None = None) -> FarmHealth:
     today = today or date.today()
     farm: FarmInfo = ports.get_farm(session, farm_id)
@@ -145,6 +169,7 @@ def get_health(session: Session, farm_id: str, as_of: date | None = None, today:
     as_of = as_of or (DEMO_AS_OF if demo else today)
     if as_of > today:
         raise InvalidDate("That date is in the future.")
+    outage = _refresh_if_stale(farm, as_of) if demo else None
     wvalues: dict[str, WeatherValue] = {}
     weather: list[Indicator] = []
     if farm.center is not None:
@@ -162,6 +187,6 @@ def get_health(session: Session, farm_id: str, as_of: date | None = None, today:
     return FarmHealth(
         farm=FarmRef(id=farm.id, name=farm.name, region=farm.region, center=farm.center),
         as_of=as_of, today=today, is_replay=as_of < today, replay_date=DEMO_AS_OF if demo else None,
-        data_note=DEMO_NOTE if demo else OTHER_NOTE, data_through=ports.data_through() if demo else None,
+        data_note=outage or (DEMO_NOTE if demo else OTHER_NOTE), data_through=ports.data_through() if demo else None,
         greenness_available=demo, weather=weather, fields=fields, findings=findings,
         assumptions=[Assumption(topic=t, text=x, source=s) for t, x, s in ASSUMPTIONS], sources=sources)
