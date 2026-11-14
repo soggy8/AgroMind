@@ -1,3 +1,4 @@
+import { CommandCenterPage } from "../modules/cropdoctor/pages/CommandCenterPage";
 import { SimulatorPage } from "../modules/simulator/pages/SimulatorPage";
 import { UnitsProvider } from "../shared/units";
 import { PlaceholderPage } from "./PlaceholderPage";
@@ -8,8 +9,8 @@ export function App() {
   const [route, navigate] = useRoute();
   return (
     <UnitsProvider>
-      {route === "simulator"
-        ? <SimulatorPage route={route} onNavigate={navigate} />
+      {route === "command-center" ? <CommandCenterPage route={route} onNavigate={navigate} />
+        : route === "simulator" ? <SimulatorPage route={route} onNavigate={navigate} />
         : <PlaceholderPage route={route} onNavigate={navigate} />}
     </UnitsProvider>
   );

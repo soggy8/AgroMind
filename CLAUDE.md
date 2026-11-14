@@ -38,6 +38,24 @@ NASA Space Apps project: a farm digital twin with a crop-rotation simulator. Thr
 - Database changes need an Alembic migration; never run `alembic downgrade` on a shared database
   without checking `alembic current` first.
 
+## Working on CropDoctor
+
+- Stay inside `backend/app/modules/cropdoctor/`, `backend/tests/cropdoctor/`,
+  `frontend/src/modules/cropdoctor/` and `docs/modules/cropdoctor*`. Other modules and `shared/`
+  belong to teammates; the small exceptions are listed in `docs/modules/cropdoctor.md` section 10.
+  Say what you touched there.
+- Read the farm only through `croptwin.service`. Never import the Simulator.
+- Field data, weather and satellite data go through `ports.py` only.
+- `indicators/`, `baselines.py`, `anomalies.py` and `explanations.py` stay pure: no FastAPI,
+  pydantic, database or network imports.
+- Thresholds live only in `parameters.py`, marked ASSUME with a reason. Never tune one to make the
+  demo show a finding. If the rule doesn't fire on real values, stop and report it.
+- Findings stay cautious: observation, anomaly, possible explanation, recommended check. No
+  "detected", "caused by" or "confirmed". Every finding says satellites can't rule out pests or disease.
+- `schemas.py` and the frontend `types.ts` are one contract. Change both in the same commit.
+- To extend the committed samples, rerun `cd backend && .venv/bin/python -m app.modules.cropdoctor.fetch_samples`.
+- Checks: `cd backend && .venv/bin/python -m pytest`; `cd frontend && npm run build && npx playwright test`.
+
 ## Commits
 
 No Claude attribution lines in commit messages or PR descriptions.

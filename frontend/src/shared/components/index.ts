@@ -1,6 +1,9 @@
+export { Badge } from "./Badge";
 export { Button } from "./Button";
 export { Drawer } from "./Drawer";
+export { FieldRow } from "./FieldRow";
 export { Glass } from "./Glass";
+export { IndicatorRow } from "./IndicatorRow";
 export { InfoTip } from "./InfoTip";
 export { KindTag, type ValueKind } from "./KindTag";
 export { SegmentedTabs, type Segment } from "./SegmentedTabs";
