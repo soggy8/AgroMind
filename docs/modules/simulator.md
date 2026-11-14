@@ -28,6 +28,8 @@ python -m app.modules.simulator.calibration --write   # regenerate the calibrati
 npm install
 npm run dev            # http://localhost:5173/#/simulator, proxies /api to 127.0.0.1:8000
 npm run build          # type-check + production build
+npm run e2e            # Playwright smoke tests, desktop + phone (needs API and dev server running;
+                       # first time: npx playwright install chromium)
 ```
 
 If port 8000 is taken, run the API on another port and start Vite with
