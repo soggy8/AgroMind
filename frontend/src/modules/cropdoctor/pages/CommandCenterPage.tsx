@@ -1,5 +1,5 @@
-import { AlertTriangle, RefreshCw } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { AlertTriangle, MessageSquareText, RefreshCw } from "lucide-react";
+import { useCallback, useState, type ReactNode } from "react";
 import { TopBar } from "../../../app/TopBar";
 import type { Route } from "../../../app/route";
 import { ndviStep } from "../../../shared/charts/ndvi";
@@ -7,6 +7,7 @@ import { NdviKey } from "../../../shared/charts/NdviKey";
 import { Button, Glass, SegmentedTabs, Skeleton } from "../../../shared/components";
 import { useMedia } from "../../../shared/hooks/useMedia";
 import { FarmMap, type MapField, type MapInsets } from "../../../shared/map/FarmMap";
+import { AdvisorDrawer } from "../components/AdvisorDrawer";
 import { DateControl, ReplayPill } from "../components/DateControl";
 import { FieldsPanel, statusTone } from "../components/FieldsPanel";
 import { StatusPanel } from "../components/StatusPanel";
@@ -38,6 +39,9 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
   const desktop = useMedia(DESKTOP);
   const [layer, setLayer] = useState<Layer>("greenness");
   const [picked, setTab] = useState<Tab | null>(null);
+  const [advisorOpen, setAdvisorOpen] = useState(false);
+  const closeAdvisor = useCallback(() => setAdvisorOpen(false), []);
+  const drawer = advisorOpen && <AdvisorDrawer onClose={closeAdvisor} />;
 
   const n = health?.findings.length ?? 0;
   // Opens on Status when there is a finding, otherwise Fields, until the user picks a tab.
@@ -53,6 +57,10 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
             </span>
           )}
           {health && desktop && <DateControl health={health} onPick={setAsOf} />}
+          <Button variant="primary" onClick={() => setAdvisorOpen(true)} aria-label="Ask the advisor">
+            <MessageSquareText size={16} strokeWidth={1.75} />
+            <span className="hidden whitespace-nowrap lg:inline">Ask the advisor</span>
+          </Button>
         </>
       } />
   );
@@ -61,7 +69,7 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
 
   if (error && !health) {
     return (
-      <Centered topBar={topBar}>
+      <Centered topBar={topBar} drawer={drawer}>
         <h2 className="flex items-center gap-2 text-[19px] font-bold"><AlertTriangle size={20} strokeWidth={1.75} className="text-alert" /> Couldn&apos;t load the farm&apos;s health</h2>
         <p className="mt-2 text-sm leading-normal text-mut">{error}</p>
         <Button className="mt-4" onClick={retry}><RefreshCw size={15} strokeWidth={1.75} /> Try again</Button>
@@ -71,7 +79,7 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
 
   if (health && health.fields.length === 0) {
     return (
-      <Centered topBar={topBar}>
+      <Centered topBar={topBar} drawer={drawer}>
         <h2 className="text-[21px] font-bold tracking-[-.01em]">Draw your first field</h2>
         <p className="mt-2 text-sm leading-normal text-mut">
           {health.farm.name} has no fields yet. Add one in the farm profile, then come back to see its greenness against its normal.
@@ -136,6 +144,7 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
         <Glass as="aside" aria-label="Field status" className="anim-in absolute bottom-5 right-5 top-[94px] z-10 w-[410px] overflow-hidden">
           {statusPanel}
         </Glass>
+        {drawer}
       </div>
     );
   }
@@ -160,14 +169,16 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
         <div className="flex min-h-0 flex-1 flex-col">{tab === "status" ? statusPanel : fieldsPanel}</div>
       </Glass>
       <footer className="mx-4 mb-4 text-[12px] text-mut">{sourceText(health, fieldId, loading)}</footer>
+      {drawer}
     </div>
   );
 }
 
-function Centered({ topBar, children }: { topBar: ReactNode; children: ReactNode }) {
+function Centered({ topBar, drawer, children }: { topBar: ReactNode; drawer: ReactNode; children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
       {topBar}
+      {drawer}
       <main className="grid flex-1 place-items-center p-6">
         <h1 className="sr-only">Command Center</h1>
         <Glass className="max-w-md p-6">{children}</Glass>
