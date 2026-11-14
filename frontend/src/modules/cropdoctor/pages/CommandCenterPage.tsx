@@ -20,6 +20,7 @@ const DESKTOP_INSETS: MapInsets = { left: 370, right: 430, top: 94, bottom: 20 }
 const STACKED_INSETS: MapInsets = { left: 0, right: 0, top: 0, bottom: 0 };
 
 type Layer = "satellite" | "greenness";
+type Tab = "fields" | "status";
 
 function sourceText(health: FarmHealth | null, fieldId: string | null, loading: boolean): string {
   const parts: string[] = [];
@@ -36,8 +37,11 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
   const { health, loading, error, setAsOf, fieldId, selectField, retry } = useHealth(FARM_ID);
   const desktop = useMedia(DESKTOP);
   const [layer, setLayer] = useState<Layer>("greenness");
+  const [picked, setTab] = useState<Tab | null>(null);
 
   const n = health?.findings.length ?? 0;
+  // Opens on Status when there is a finding, otherwise Fields, until the user picks a tab.
+  const tab: Tab = picked ?? (n > 0 ? "status" : "fields");
   const topBar = (
     <TopBar route={route} onNavigate={onNavigate} farmName={health?.farm.name ?? "Demo Farm"} region={health?.farm.region ?? undefined}
       actions={
@@ -81,7 +85,7 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
     const v = f.greenness?.value;
     return {
       id: f.id, name: f.name, boundary: f.boundary,
-      chip: v?.value != null ? fmtValue(v) : undefined,
+      chip: desktop && v?.value != null ? fmtValue(v) : undefined, // chips overlap on a small map
       ndviStep: layer === "greenness" && v?.value != null ? ndviStep(v.value) : null,
       tone: statusTone(f.status),
     };
@@ -136,11 +140,10 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
     );
   }
 
-  // Below 1024 px: the same panels stacked (the phone layout with tabs comes later).
+  // Below 1024 px: the map, then one glass section with Fields / Status tabs (the Simulator's phone layout).
   return (
     <div className="flex min-h-full flex-col">
       {topBar}
-      {health && <div className="mx-4 mt-3 flex flex-wrap"><DateControl health={health} onPick={setAsOf} /></div>}
       <main aria-label="Farm map" className="relative mx-4 mt-3 block h-[42vh] min-h-[260px] overflow-hidden rounded-panel border border-line">
         {pageTitle}
         {map}
@@ -148,8 +151,14 @@ export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavig
         {health?.is_replay && <div className="absolute bottom-2 left-2 z-[500]"><ReplayPill asOf={health.as_of} /></div>}
       </main>
       {refreshError && <div className="mx-4 mt-3">{refreshError}</div>}
-      <Glass as="aside" aria-label="Fields" className="mx-4 mt-3 overflow-hidden">{fieldsPanel}</Glass>
-      <Glass as="aside" aria-label="Field status" className="mx-4 mb-4 mt-3 overflow-hidden">{statusPanel}</Glass>
+      <Glass as="section" aria-label="Command Center" className="mx-4 mb-4 mt-3 flex min-h-[70vh] flex-col overflow-hidden">
+        {health && <div className="flex flex-wrap border-b border-line p-2.5"><DateControl health={health} onPick={setAsOf} /></div>}
+        <div className="border-b border-line p-2.5">
+          <SegmentedTabs label="Command Center views" value={tab} onChange={setTab}
+            items={[{ id: "fields", label: "Fields" }, { id: "status", label: "Status" }]} />
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col">{tab === "status" ? statusPanel : fieldsPanel}</div>
+      </Glass>
       <footer className="mx-4 mb-4 text-[12px] text-mut">{sourceText(health, fieldId, loading)}</footer>
     </div>
   );
