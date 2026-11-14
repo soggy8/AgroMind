@@ -8,21 +8,28 @@ from __future__ import annotations
 import csv
 import re
 import time
+from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 import httpx
+from sqlalchemy.orm import Session
 
 from app.core.config import REPO_ROOT
+from app.modules.croptwin import service as croptwin
 
-from .indicators.vegetation import Reading
+from .indicators.vegetation import Reading, period_end
 from .indicators.weather import Day, Weather
 from .parameters import GOOD_RELIABILITY
 
 
 class DataUnavailable(RuntimeError):
+    pass
+
+
+class NotFound(LookupError):
     pass
 
 
@@ -159,18 +166,18 @@ def read_readings(path: Path) -> dict[str, list[Reading]]:
     return out
 
 
-def write_crops(path: Path, rows: Mapping[str, Mapping[int, tuple[int, str]]], header: Sequence[str]) -> None:
+def write_crops(path: Path, rows: Mapping[str, Mapping[int, tuple[int, str, int, int]]], header: Sequence[str]) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
         for line in header:
             f.write(line.rstrip("\n") + "\n")
         w = csv.writer(f, lineterminator="\n")
-        w.writerow(["field_id", "year", "code", "crop"])
+        w.writerow(["field_id", "year", "code", "crop", "points_agreeing", "points_total"])
         for fid, years in rows.items():
             for year in sorted(years):
-                code, name = years[year]
-                w.writerow([fid, year, code, name])
+                code, name, agreeing, total = years[year]
+                w.writerow([fid, year, code, name, agreeing, total])
 
 
 @lru_cache(maxsize=1)
@@ -209,6 +216,81 @@ def has_sample(field_ids: Iterable[str]) -> bool:
         return False
     known = _greenness()
     return all(i in known for i in ids)
+
+
+# ---------- the farm (CropTwin, through its service only) ----------
+
+@dataclass(frozen=True)
+class FieldInfo:
+    id: str
+    name: str
+    boundary: tuple[tuple[float, float], ...]   # (lat, lon), ring not closed
+    centroid: tuple[float, float]
+    area_ha: float
+    crop_id: str | None
+    soil_texture: str | None
+    sand_pct: float | None
+    silt_pct: float | None
+    clay_pct: float | None
+    ph: float | None
+    soil_depth: str | None
+    soil_source: str | None
+
+
+@dataclass(frozen=True)
+class FarmInfo:
+    id: str
+    name: str
+    region: str | None
+    center: tuple[float, float] | None
+    fields: tuple[FieldInfo, ...]
+
+
+def get_farm(session: Session, farm_id: str) -> FarmInfo:
+    try:
+        farm = croptwin.get_farm(session, farm_id)
+    except croptwin.NotFound as e:
+        raise NotFound(str(e)) from e
+    fields = []
+    for f in farm.fields:
+        ring = [(lat, lon) for lon, lat in f.boundary.coordinates[0]]
+        if len(ring) > 1 and ring[0] == ring[-1]:
+            ring = ring[:-1]
+        layer = min(f.soil_layers, key=lambda l: l.depth_top_cm, default=None)
+        fields.append(FieldInfo(
+            f.id, f.name, tuple(ring), (f.centroid_lat, f.centroid_lon), f.area_ha, f.current_crop_id,
+            f.soil_texture, *(None, None, None, None, None, None) if layer is None else
+            (layer.sand_pct, layer.silt_pct, layer.clay_pct, layer.ph,
+             f"{layer.depth_top_cm} to {layer.depth_bottom_cm} cm", layer.source)))
+    centre = None
+    if fields:
+        centre = (sum(f.centroid[0] for f in fields) / len(fields), sum(f.centroid[1] for f in fields) / len(fields))
+    return FarmInfo(farm.id, farm.name, farm.region, centre, tuple(fields))
+
+
+def in_sample_cell(lat: float, lon: float) -> bool:
+    return abs(lat - 42.03) < 0.25 and abs(lon + 93.46) < 0.3125
+
+
+def weather_for(lat: float, lon: float, as_of: date) -> Weather:
+    """The committed sample inside its cell, otherwise NASA POWER for the 11 years up to as_of (cached)."""
+    if in_sample_cell(lat, lon):
+        return load_weather()
+    lat, lon = round(lat, 2), round(lon, 2)
+    start = date(as_of.year - 11, 1, 1)
+    path = CACHE / "power" / f"{lat}_{lon}_{start.isoformat()}_{as_of.isoformat()}.csv"
+    if not path.exists():
+        text = fetch_power_csv(lat, lon, start, as_of)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text.replace("\r\n", "\n"), encoding="utf-8", newline="\n")
+    return parse_power_csv(path)
+
+
+def data_through() -> date:
+    """The earlier of the last sample day with a daily high and the end of the last greenness period."""
+    last_weather = max(d for d, day in load_weather().days.items() if day.tmax_c is not None)
+    last_period = max(period_end(r.year, r.doy) for rs in _greenness().values() for r in rs[-1:])
+    return min(last_weather, last_period)
 
 
 # ---------- network (used only by fetch_samples) ----------

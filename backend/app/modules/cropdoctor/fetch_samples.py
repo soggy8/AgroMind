@@ -85,11 +85,26 @@ def fetch_greenness(centre, points) -> dict[str, list[Reading]]:
     return out
 
 
-def fetch_crops(centre, points) -> dict[str, dict[int, tuple[int, str]]]:
+def crop_label(codes: list[int], names: dict[int, str]) -> tuple[int, str, int]:
+    """(majority code, label, points agreeing). Label is the class name when every point agrees,
+    otherwise "Mixed: A and B" (most points first, ties in order of first appearance)."""
+    counts = Counter(codes)                       # insertion order = first appearance
+    ranked = sorted(counts, key=lambda c: -counts[c])   # stable: ties keep first-appearance order
+    name = lambda c: names.get(c, f"Class {c}")
+    if len(ranked) == 1:
+        label = name(ranked[0])
+    elif len(ranked) == 2:
+        label = f"Mixed: {name(ranked[0])} and {name(ranked[1])}"
+    else:
+        label = "Mixed: " + ", ".join(name(c) for c in ranked[:-1]) + f" and {name(ranked[-1])}"
+    return ranked[0], label, counts[ranked[0]]
+
+
+def fetch_crops(centre, points) -> dict[str, dict[int, tuple[int, str, int, int]]]:
     classes = httpx.get(f"{ports.STAC_URL}/collections/{ports.CDL}", timeout=40).json()
     names = {c["value"]: c["description"]
              for c in classes["item_assets"]["cropland"]["classification:classes"]}
-    out: dict[str, dict[int, tuple[int, str]]] = {fid: {} for fid in points}
+    out: dict[str, dict[int, tuple[int, str, int, int]]] = {fid: {} for fid in points}
     jobs = []
     for year in CDL_YEARS:
         ids = [i for i in ports.fetch_item_ids(ports.CDL, centre[0], centre[1], date(year, 1, 1), date(year, 12, 31))
@@ -112,8 +127,8 @@ def fetch_crops(centre, points) -> dict[str, dict[int, tuple[int, str]]]:
         for year, fid, codes in pool.map(one, jobs):
             valid = [int(c) for c in codes if c is not None]
             if valid:
-                code = Counter(valid).most_common(1)[0][0]
-                out[fid][year] = (code, names.get(code, f"Class {code}"))
+                code, label, agreeing = crop_label(valid, names)
+                out[fid][year] = (code, label, agreeing, len(valid))
     return out
 
 
@@ -130,11 +145,25 @@ def summarise(rows: dict[str, list[Reading]]) -> None:
               f"first {rs[0].year}/{rs[0].doy}, last {rs[-1].year}/{rs[-1].doy}")
 
 
-def main() -> None:
+def write_crops(centre, points, got: str) -> None:
+    crops = fetch_crops(centre, points)
+    ports.write_crops(ports.CROPS_SAMPLE, crops, [
+        "# Source: USDA NASS Cropland Data Layer (30 m), via Microsoft Planetary Computer",
+        f"# Collection: {ports.CDL}, asset cropland, 2008 to 2021 (the years the collection holds). {got}",
+        "# Method: the same five points per field. code is the most common class; points_agreeing of points_total",
+        "# have it. crop is that class's name when all points agree, else 'Mixed: A and B' (most points first).",
+        "# Class names come from the collection's classification:classes."])
+
+
+def main(crops_only: bool = False) -> None:
     today = date.today()
     centre, rings = _load_farm()
     points = {fid: ports.sample_points(ring) for fid, ring in rings.items()}
     got = f"Retrieved {today.isoformat()}."
+    if crops_only:
+        write_crops(centre, points, got)
+        print(f"Wrote {ports.CROPS_SAMPLE.name}.")
+        return
     greenness = fetch_greenness(centre, points)
     ports.write_readings(ports.GREENNESS_SAMPLE, greenness, [
         "# Source: MODIS MOD13Q1 (Terra) and MYD13Q1 (Aqua) version 061, 250 m, 16-day NDVI, via Microsoft Planetary Computer",
@@ -142,12 +171,7 @@ def main() -> None:
         "# Method: five points per field (centroid plus four inset points inside the boundary); field mean of points",
         "# with pixel reliability 0 or 1, NDVI scaled by 0.0001; ndvi is blank when no point is usable.",
         "# doy is the start day of the 16-day period."])
-    crops = fetch_crops(centre, points)
-    ports.write_crops(ports.CROPS_SAMPLE, crops, [
-        "# Source: USDA NASS Cropland Data Layer (30 m), via Microsoft Planetary Computer",
-        f"# Collection: {ports.CDL}, asset cropland, 2008 to 2021 (the years the collection holds). {got}",
-        "# Method: the same five points per field; the most common class code is the field's crop for the year.",
-        "# Class names come from the collection's classification:classes."])
+    write_crops(centre, points, got)
     ports.SAMPLES.mkdir(parents=True, exist_ok=True)
     (ports.WEATHER_SAMPLE_2026).write_text(fetch_weather(today), encoding="utf-8", newline="\n")
     summarise(greenness)
@@ -155,4 +179,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(crops_only="--crops-only" in sys.argv)

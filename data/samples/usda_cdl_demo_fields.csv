@@ -1,47 +1,48 @@
 # Source: USDA NASS Cropland Data Layer (30 m), via Microsoft Planetary Computer
 # Collection: usda-cdl, asset cropland, 2008 to 2021 (the years the collection holds). Retrieved 2026-11-14.
-# Method: the same five points per field; the most common class code is the field's crop for the year.
+# Method: the same five points per field. code is the most common class; points_agreeing of points_total
+# have it. crop is that class's name when all points agree, else 'Mixed: A and B' (most points first).
 # Class names come from the collection's classification:classes.
-field_id,year,code,crop
-north,2008,1,Corn
-north,2009,5,Soybeans
-north,2010,1,Corn
-north,2011,1,Corn
-north,2012,5,Soybeans
-north,2013,1,Corn
-north,2014,5,Soybeans
-north,2015,5,Soybeans
-north,2016,5,Soybeans
-north,2017,1,Corn
-north,2018,5,Soybeans
-north,2019,1,Corn
-north,2020,5,Soybeans
-north,2021,1,Corn
-creek,2008,1,Corn
-creek,2009,5,Soybeans
-creek,2010,1,Corn
-creek,2011,5,Soybeans
-creek,2012,1,Corn
-creek,2013,5,Soybeans
-creek,2014,1,Corn
-creek,2015,5,Soybeans
-creek,2016,1,Corn
-creek,2017,5,Soybeans
-creek,2018,1,Corn
-creek,2019,5,Soybeans
-creek,2020,1,Corn
-creek,2021,5,Soybeans
-west,2008,1,Corn
-west,2009,5,Soybeans
-west,2010,176,Grassland/Pasture
-west,2011,176,Grassland/Pasture
-west,2012,1,Corn
-west,2013,5,Soybeans
-west,2014,1,Corn
-west,2015,5,Soybeans
-west,2016,1,Corn
-west,2017,176,Grassland/Pasture
-west,2018,1,Corn
-west,2019,176,Grassland/Pasture
-west,2020,1,Corn
-west,2021,176,Grassland/Pasture
+field_id,year,code,crop,points_agreeing,points_total
+north,2008,1,Mixed: Corn and Soybeans,3,5
+north,2009,5,Mixed: Soybeans and Corn,3,5
+north,2010,1,Mixed: Corn and Soybeans,3,5
+north,2011,1,Mixed: Corn and Soybeans,3,5
+north,2012,5,Mixed: Soybeans and Corn,3,5
+north,2013,1,Mixed: Corn and Soybeans,3,5
+north,2014,5,Mixed: Soybeans and Corn,3,5
+north,2015,5,Mixed: Soybeans and Corn,3,5
+north,2016,5,Mixed: Soybeans and Corn,3,5
+north,2017,1,Mixed: Corn and Soybeans,3,5
+north,2018,5,Mixed: Soybeans and Corn,3,5
+north,2019,1,Mixed: Corn and Soybeans,3,5
+north,2020,5,Mixed: Soybeans and Corn,3,5
+north,2021,1,Mixed: Corn and Soybeans,3,5
+creek,2008,1,Corn,5,5
+creek,2009,5,Soybeans,5,5
+creek,2010,1,Corn,5,5
+creek,2011,5,Soybeans,5,5
+creek,2012,1,Corn,5,5
+creek,2013,5,Soybeans,5,5
+creek,2014,1,Corn,5,5
+creek,2015,5,Soybeans,5,5
+creek,2016,1,Corn,5,5
+creek,2017,5,Soybeans,5,5
+creek,2018,1,Corn,5,5
+creek,2019,5,Soybeans,5,5
+creek,2020,1,Corn,5,5
+creek,2021,5,Soybeans,5,5
+west,2008,1,"Mixed: Corn, Grassland/Pasture and Soybeans",3,5
+west,2009,5,"Mixed: Soybeans, Grassland/Pasture and Corn",2,5
+west,2010,176,"Mixed: Grassland/Pasture, Corn and Soybeans",2,5
+west,2011,176,"Mixed: Grassland/Pasture, Corn and Soybeans",2,5
+west,2012,1,Mixed: Corn and Grassland/Pasture,3,5
+west,2013,5,Mixed: Soybeans and Grassland/Pasture,3,5
+west,2014,1,Mixed: Corn and Grassland/Pasture,3,5
+west,2015,5,Mixed: Soybeans and Grassland/Pasture,3,5
+west,2016,1,Mixed: Corn and Grassland/Pasture,3,5
+west,2017,176,"Mixed: Grassland/Pasture, Corn and Soybeans",2,5
+west,2018,1,"Mixed: Corn, Grassland/Pasture and Herbaceous Wetlands",3,5
+west,2019,176,"Mixed: Grassland/Pasture, Corn and Soybeans",2,5
+west,2020,1,Mixed: Corn and Grassland/Pasture,3,5
+west,2021,176,"Mixed: Grassland/Pasture, Corn and Soybeans",2,5

@@ -66,6 +66,6 @@ def test_committed_samples_cover_the_demo_fields():
         assert rs[0].year <= 2002 and rs[-1].year == 2026
         assert {r.satellite for r in rs} == {"Terra", "Aqua"}
     assert ports.has_sample(["north", "creek", "west"]) and not ports.has_sample([]) and not ports.has_sample(["x"])
-    assert ports.load_crops("creek")[2012] == "Corn" and ports.load_crops("north")[2012] == "Soybeans"
+    assert ports.load_crops("creek")[2012] == "Corn" and ports.load_crops("north")[2012] == "Mixed: Soybeans and Corn"
     w = ports.load_weather()
     assert date(2012, 8, 12) in w.days and max(w.days).year == 2026
