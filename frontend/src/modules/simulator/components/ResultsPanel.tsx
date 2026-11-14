@@ -1,5 +1,5 @@
 import { CloudSun, FlaskConical, RefreshCw, Sprout } from "lucide-react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { KindTag, SegmentedTabs, Skeleton } from "../../../shared/components";
 import { scenarioSummary } from "../lib/format";
 import type { useSimulator } from "../state/useSimulator";
@@ -11,7 +11,8 @@ import { IndicatorBars } from "./IndicatorBars";
 import { RecommendationBlock } from "./RecommendationBlock";
 import { SavedRuns } from "./SavedRuns";
 import { SeasonTable } from "./SeasonTable";
-import { WeatherYearsChart } from "./WeatherYearsChart";
+// Recharts is only needed once there is a result, so it loads in its own chunk.
+const WeatherYearsChart = lazy(() => import("./WeatherYearsChart").then((m) => ({ default: m.WeatherYearsChart })));
 
 type Tab = "compare" | "seasons" | "assumptions" | "saved";
 type Sim = ReturnType<typeof useSimulator>;
@@ -62,7 +63,9 @@ export function ResultsPanel({ options, sim }: { options: SimulatorOptions; sim:
               <ChangeVsToday result={result} />
               <ClimateCompare result={result} />
               <IndicatorBars result={result} />
-              <WeatherYearsChart result={result} />
+              <Suspense fallback={<Skeleton className="h-[220px] w-full" />}>
+                <WeatherYearsChart result={result} />
+              </Suspense>
             </>
           )}
           {tab === "seasons" && <SeasonTable result={result} crops={options.crops} />}

@@ -20,7 +20,7 @@ export function ClimateCompare({ result }: { result: SimulationResult }) {
       <table className="mt-2 w-full text-sm">
         <thead>
           <tr className="text-left">
-            <th className="pb-1.5 font-normal" />
+            <th className="pb-1.5 font-normal"><span className="sr-only">Measure</span></th>
             <th className="pb-1.5 text-right font-normal"><KindTag kind="observed" /></th>
             {!today && <th className="pb-1.5 text-right font-normal"><KindTag kind="scenario" /></th>}
           </tr>

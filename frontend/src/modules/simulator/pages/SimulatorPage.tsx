@@ -41,11 +41,13 @@ export function SimulatorPage({ route, onNavigate }: { route: Route; onNavigate:
     if (!desktop) setSheet("results");
   };
 
+  const pageTitle = <h1 className="sr-only">Farm Simulator</h1>;
+
   const topBar = (
     <TopBar route={route} onNavigate={onNavigate} farmName={options?.farm.name ?? "Demo Farm"}
       region={options?.farm.region ?? undefined}
       actions={
-        <Button onClick={() => setAdvisorOpen(true)}>
+        <Button onClick={() => setAdvisorOpen(true)} aria-label="Ask the advisor">
           <MessageSquareText size={16} strokeWidth={1.75} />
           <span className="hidden whitespace-nowrap lg:inline">Ask the advisor</span>
         </Button>
@@ -116,7 +118,12 @@ export function SimulatorPage({ route, onNavigate }: { route: Route; onNavigate:
     <div className={desktop ? "relative h-full overflow-hidden" : "flex min-h-full flex-col"}>
       {desktop ? (
         <>
-          {map}
+          <main aria-label="Farm map" className="absolute inset-0">
+            {pageTitle}
+            {map}
+            <div className="absolute left-[390px] right-[450px] top-[94px] z-10 flex justify-center">{scenarioPill}</div>
+            <div className="absolute bottom-5 right-[450px] z-10">{sourcePill}</div>
+          </main>
           <div className="absolute inset-x-0 top-0 z-20">{topBar}</div>
           <Glass as="aside" aria-label="Simulation set-up" className="anim-in absolute bottom-5 left-5 top-[94px] z-10 w-[350px] overflow-hidden">
             {setup}
@@ -124,24 +131,23 @@ export function SimulatorPage({ route, onNavigate }: { route: Route; onNavigate:
           <Glass as="aside" aria-label="Simulation results" className="anim-in absolute bottom-5 right-5 top-[94px] z-10 w-[410px] overflow-hidden">
             {results}
           </Glass>
-          <div className="absolute left-[390px] right-[450px] top-[94px] z-10 flex justify-center">{scenarioPill}</div>
-          <div className="absolute bottom-5 right-[450px] z-10">{sourcePill}</div>
         </>
       ) : (
         <>
           {topBar}
-          <div className="relative mx-4 mt-3 h-[42vh] min-h-[260px] overflow-hidden rounded-panel border border-line">
+          <main aria-label="Farm map" className="relative mx-4 mt-3 block h-[42vh] min-h-[260px] overflow-hidden rounded-panel border border-line">
+            {pageTitle}
             {map}
             <div className="absolute bottom-2 left-2 right-2 z-[500]">{scenarioPill}</div>
-          </div>
-          <Glass as="section" className="mx-4 mb-4 mt-3 flex min-h-[70vh] flex-col overflow-hidden">
+          </main>
+          <Glass as="section" aria-label="Simulation" className="mx-4 mb-4 mt-3 flex min-h-[70vh] flex-col overflow-hidden">
             <div className="border-b border-line p-2.5">
               <SegmentedTabs label="Simulator views" value={sheet} onChange={setSheet}
                 items={[{ id: "setup", label: "Set up" }, { id: "results", label: "Results" }]} />
             </div>
             <div className="flex min-h-0 flex-1 flex-col">{sheet === "setup" ? setup : results}</div>
           </Glass>
-          <div className="mx-4 mb-4 text-[12px] text-mut">Imagery © Esri · Weather NASA POWER · Soil SoilGrids</div>
+          <footer className="mx-4 mb-4 text-[12px] text-mut">Imagery © Esri · Weather NASA POWER · Soil SoilGrids</footer>
         </>
       )}
       {advisorOpen && <AdvisorDrawer farmId={FARM_ID} result={state.result} onClose={closeAdvisor} />}
