@@ -5,6 +5,10 @@
 
 Provenance is stored with the value: soil layers and crop history carry a `source`, and a
 field's area records whether it was computed from the boundary or entered by the farmer.
+
+A farm can also have a map point (location_lat/location_lon, migration 0003). Deleting a farm removes its fields,
+soil layers and crop history (ORM cascades below) and, in the database, the Simulator's simulation_runs for that farm
+(their farm_id foreign key is ON DELETE CASCADE, migration 0002).
 """
 from __future__ import annotations
 
@@ -24,6 +28,9 @@ class Farm(IdMixin, TimestampMixin, Base):
     # Relative weights {"yield", "water", "risk", "soil", "margin"}; shape is schemas.FarmPriorities.
     priorities: Mapped[dict] = mapped_column(JSONType, default=dict)
     constraints: Mapped[str | None] = mapped_column(Text)  # farmer's own words, e.g. "no irrigation on west side"
+    # The farm's point (WGS84), where its map opens before any field is drawn. Optional: fields locate a farm too.
+    location_lat: Mapped[float | None] = mapped_column(Float)
+    location_lon: Mapped[float | None] = mapped_column(Float)
 
     fields: Mapped[list[Field]] = relationship(back_populates="farm", cascade="all, delete-orphan",
                                                order_by="Field.created_at")
