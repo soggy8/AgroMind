@@ -137,9 +137,10 @@ the **centre pixel** of each demo field; the build uses a field mean, so these w
 - **Normal** is the mean of the 10 years before the `as_of` year, same period or same 30-day
   window. **(Kiril)** At least 7 of those years must have data, otherwise the value is shown
   without a comparison. **(call)**
-- **Default date: 12 August 2012. (call, Kiril said "just pick one year")** It is the first date
-  on which two low periods had both ended, so the first date the rule can honestly fire. It was
-  confirmed on field means; the finding on that date is on West Field.
+- **Default date: 12 August 2012. (call, Kiril said "just pick one year")**
+  The date was picked from the centre-pixel reading of Creek. On field means the finding is on West Field, whose Watch can
+  first be seen on 4 Aug 2012. 12 August is kept as the demo date because by then the 30-day
+  weather shows the drought.
 - "Today" uses the samples plus a refresh from POWER and Planetary Computer, cached under
   `data/cache/`. If the refresh fails the screen says which date the saved data runs to.
 

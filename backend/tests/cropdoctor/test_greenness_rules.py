@@ -7,14 +7,7 @@ from app.modules.cropdoctor import anomalies, baselines, parameters, ports
 from app.modules.cropdoctor.indicators import vegetation
 from app.modules.cropdoctor.indicators.vegetation import Reading
 
-
-def season(values_2012, base=0.90, spread=0.02, doys=(185, 193, 201, 209, 217)):
-    rs = []
-    for i, y in enumerate(range(2002, 2012)):
-        v = (base - spread) + (2 * spread) * i / 9
-        rs += [Reading(y, d, v, "Terra", 10, 10) for d in doys]
-    rs += [Reading(2012, d, v, "Terra", 10, 10) for d, v in values_2012.items()]
-    return rs
+from .conftest import season
 
 
 def test_normal_uses_the_ten_years_before():
