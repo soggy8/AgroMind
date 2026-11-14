@@ -88,6 +88,10 @@ run `docker compose up -d db` and set `DATABASE_URL` as in `.env.example`.
 
 Frontend, from `frontend/`: `npm install && npm run dev` (proxies `/api` to port 8000).
 
+Supported versions: Python 3.11+ (developed on 3.14), Node `^20.19 || >=22.12` (Vite 8; developed on Node 25).
+On Windows activate the venv with `.venv\Scripts\activate` instead of `source .venv/bin/activate`.
+The database port is published on `127.0.0.1` only; `POSTGRES_PASSWORD` in `.env` overrides the dev default.
+
 ## Status
 
 - Platform: settings, database layer, migrations, health check. See `docs/architecture.md`.

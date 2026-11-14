@@ -38,3 +38,12 @@ data/processed/*
 # Simulator runtime data
 backend/var/
 data/cache/
+
+# Claude Code / skills: personal or generated
+.superpowers/
+.claude/settings.local.json
+
+# Test / build output
+frontend/test-results/
+frontend/playwright-report/
+*.tsbuildinfo

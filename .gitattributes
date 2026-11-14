@@ -1,0 +1,19 @@
+# Normalise line endings in the repository to LF; checkouts use the OS default for text files.
+* text=auto
+
+# Always LF: these break under bash/WSL/Linux/macOS if checked out with CRLF.
+*.sh text eol=lf
+*.bash text eol=lf
+*.py text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.gz binary

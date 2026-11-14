@@ -50,7 +50,8 @@ def schedule(crops: list[str], years: int, previous_crop_id: str | None) -> list
 
 def day_label(day: int) -> str:
     """'May 5' for a day offset within a 365-day year."""
-    return (date(2001, 1, 1) + timedelta(days=day % DAYS_PER_YEAR)).strftime("%b %-d")
+    d = date(2001, 1, 1) + timedelta(days=day % DAYS_PER_YEAR)
+    return f"{d:%b} {d.day}"  # not "%-d": that format code is unsupported on Windows
 
 
 def season_label(crop_id: str) -> str:
