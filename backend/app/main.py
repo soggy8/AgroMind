@@ -1,29 +1,43 @@
 """AgroMind API. Each module mounts its own router here.
 
-Run from backend/:  uvicorn app.main:app --reload
+Run from backend/:
+    alembic upgrade head                        # create / migrate tables
+    python -m app.modules.croptwin.seed         # optional: demo farm
+    uvicorn app.main:app --reload
 """
 from __future__ import annotations
-
-import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import get_settings
+from app.modules.croptwin.router import router as croptwin_router
 from app.modules.simulator.router import router as simulator_router
-
-app = FastAPI(title="AgroMind API", version="0.1.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.environ.get("AGROMIND_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(simulator_router)
-# CropTwin and CropDoctor routers go here when they exist.
+from app.shared.db import check_connection
 
 
-@app.get("/api/health")
-def health() -> dict:
-    return {"status": "ok"}
+def create_app() -> FastAPI:
+    settings = get_settings()
+    app = FastAPI(title="AgroMind API", version="0.1.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(croptwin_router)
+    app.include_router(simulator_router)
+    # CropDoctor (/api/farms/{farm_id}/health) and the advisor (/api/advisor) mount here when they exist.
+
+    @app.get("/api/health", tags=["meta"])
+    def health() -> dict:
+        db_ok = check_connection()
+        return {"status": "ok" if db_ok else "degraded", "database": "ok" if db_ok else "unreachable",
+                "environment": settings.environment}
+
+    return app
+
+
+app = create_app()

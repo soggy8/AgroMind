@@ -70,6 +70,27 @@ AgroMind/
 Every value shown in the UI is one of: **observation** (measured), **model estimate**,
 or **hypothetical scenario input**. The product must always make clear which.
 
+## Running locally
+
+Backend (Python 3.11+), from `backend/`:
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+alembic upgrade head                        # create the tables (SQLite by default)
+python -m app.modules.croptwin.seed         # demo farm: Story County, Iowa
+uvicorn app.main:app --reload               # http://localhost:8000/docs
+pytest
+```
+
+With no `.env` the API uses a SQLite file at `backend/var/agromind.db`. To use PostgreSQL,
+run `docker compose up -d db` and set `DATABASE_URL` as in `.env.example`.
+
+Frontend, from `frontend/`: `npm install && npm run dev` (proxies `/api` to port 8000).
+
 ## Status
 
-Folder structure only. See `docs/` and each module's `README.md` for scope.
+- Platform: settings, database layer, migrations, health check. See `docs/architecture.md`.
+- CropTwin: farm, field, soil and crop-history tables with a CRUD API at `/api/farms`.
+- Simulator: working end to end; still reads the demo farm from `ports.py`, not CropTwin.
+- CropDoctor, connectors, advisor: not started.

@@ -17,3 +17,13 @@
 | `router.py` | `/api/farms` endpoints |
 
 Depends on: `shared` only.
+
+## Status
+
+Built as part of the platform base; the CropTwin owner should review the schema.
+
+- Tables and conventions: `docs/architecture.md`, "Database".
+- `geometry.py` computes area and centroid from the GeoJSON boundary.
+- `seed.py` loads the demo farm (`python -m app.modules.croptwin.seed`).
+- Open: the simulator's `ports.py` still serves its own copy of the demo farm. Switching it to
+  `service.get_field` is the next integration step (Simulator owner).

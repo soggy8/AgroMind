@@ -1,0 +1,21 @@
+# Local PostgreSQL with PostGIS available (not used by the schema yet; see docs/architecture.md).
+#   docker compose up -d db
+# Then set DATABASE_URL in .env to the value in .env.example and run `alembic upgrade head`.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: agromind
+      POSTGRES_PASSWORD: agromind
+      POSTGRES_DB: agromind
+    ports:
+      - "5432:5432"
+    volumes:
+      - agromind-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agromind"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  agromind-db:
