@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>AgroMind · Field Console</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--tx:#F2F5F0;--mut:#B9C2BB;--line:rgba(255,255,255,.10);
+--glass:rgba(16,20,18,.58);--glass2:rgba(255,255,255,.06);
+--lime:#C6F24E;--sky:#5CC8FF;--coral:#FF7A59;--violet:#B79BFF;--amber:#F2C46D;
+--r:#FF5A4E;--o:#FFA23A;--y:#F4E64C;--g:#86D24A;--gg:#2FB15A}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1440px;height:900px;overflow:hidden;font-family:Figtree,system-ui,sans-serif;color:var(--tx);background:#0E110F;font-variant-numeric:tabular-nums;position:relative}
+.map{position:absolute;inset:0;background:
+ radial-gradient(60% 50% at 20% 30%,#7A6A4C 0,#00000000 70%),radial-gradient(40% 40% at 80% 70%,#5E6B45 0,#00000000 70%),
+ radial-gradient(50% 60% at 60% 20%,#8B7A58 0,#00000000 70%),linear-gradient(160deg,#6D5F44,#4F5639 60%,#3E4530)}
+.map svg{position:absolute;inset:0}
+.map::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 50%,#00000000 55%,rgba(8,10,9,.55))}
+.glass{position:absolute;background:var(--glass);backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
+ border:1px solid var(--line);border-radius:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 24px 60px -12px rgba(0,0,0,.55)}
+.top{left:20px;right:20px;top:18px;height:60px;display:flex;align-items:center;gap:18px;padding:0 10px 0 20px;border-radius:16px}
+.mark{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:-.01em}
+.farm{display:flex;align-items:center;gap:8px;background:var(--glass2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:14px;font-weight:600}
+.farm span{color:var(--mut);font-weight:500}
+.tabs{display:flex;gap:2px;margin:0 auto;background:rgba(0,0,0,.25);border-radius:12px;padding:4px}
+.tabs a{padding:8px 16px;border-radius:9px;font-size:14px;font-weight:600;color:var(--mut)}
+.tabs a.on{background:rgba(255,255,255,.12);color:var(--tx);box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+.pill{display:flex;align-items:center;gap:7px;border:1px solid rgba(255,162,58,.45);background:rgba(255,162,58,.12);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:700;color:#FFC07A}
+.ask{display:flex;align-items:center;gap:8px;background:linear-gradient(180deg,#D4F86A,#AEE03A);color:#15210A;border-radius:11px;padding:10px 16px;font-weight:800;font-size:14px;box-shadow:0 6px 16px -6px rgba(0,0,0,.5)}
+.left{left:20px;top:94px;bottom:20px;width:350px;overflow:hidden}
+.lh{display:flex;justify-content:space-between;align-items:baseline;padding:18px 18px 12px}
+.lh b{font-size:16px}.lh span{font-size:13px;color:var(--mut)}
+.f{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;margin:0 10px;padding:11px 10px;border-radius:14px}
+.f .n{font-weight:700;font-size:15px}.f .s{font-size:13px;color:var(--mut);margin-top:1px}
+.f .v{text-align:right;font-weight:800;font-size:18px;letter-spacing:-.01em}.f .v small{display:block;font-size:12px;font-weight:700}
+.f.on{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+.ind{margin:4px 20px 8px;padding:0}
+.ir{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.ir:last-child{border:0}
+.ir .n{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600}
+.dot{width:8px;height:8px;border-radius:3px}
+.ir .k{grid-column:1;font-size:12px;color:var(--mut);padding-left:16px}
+.ir .v{grid-row:1/3;grid-column:2;text-align:right;font-weight:800;font-size:18px}.ir .v small{display:block;font-size:12px;font-weight:700}
+.trk{grid-column:1/-1;position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.08);margin:4px 0 0 16px}
+.trk i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.trk b{position:absolute;top:-3px;width:2px;height:12px;background:#fff;border-radius:1px}
+.strip{margin:0 20px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.strip .h{display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:9px}.strip .h span{color:var(--mut);font-weight:500}
+.bars{display:flex;gap:3px;height:12px}.bars i{flex:1;border-radius:3px}
+.axis{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:7px}
+.right{right:20px;top:94px;bottom:20px;width:410px;padding:18px;display:flex;flex-direction:column;gap:16px}
+.fd{margin:-18px -18px 0;padding:20px 18px 18px;border-radius:20px 20px 0 0;background:linear-gradient(170deg,rgba(255,162,58,.26),rgba(255,90,78,.10) 55%,rgba(255,90,78,0));border-bottom:1px solid var(--line)}
+.fd .hd{display:flex;justify-content:space-between;align-items:center}
+.fd h2{font-size:21px;letter-spacing:-.01em}
+.badge{font-size:12px;font-weight:800;color:#2A1600;background:var(--o);border-radius:999px;padding:3px 10px}
+.fd .w{font-size:13px;color:#FFD3A6;margin-top:3px}
+.fd p{font-size:14px;line-height:1.5;color:#E9ECE8;margin-top:10px}
+.fd .c{display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,162,58,.3);font-size:14px;font-weight:600;line-height:1.4}
+.ch{padding:0}
+.ch .hd{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:15px}
+.tag{font-size:11.5px;font-weight:800;letter-spacing:.05em;color:var(--sky);background:rgba(92,200,255,.12);border:1px solid rgba(92,200,255,.35);border-radius:6px;padding:2px 7px}
+.leg{display:flex;gap:14px;font-size:12px;color:var(--mut);margin:9px 0 4px}.leg b{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.lay{left:390px;top:94px;display:flex;padding:4px;border-radius:13px}
+.lay span{display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:9px;font-size:13px;font-weight:600;color:var(--mut)}
+.lay span.on{background:rgba(255,255,255,.12);color:var(--tx)}
+.zoom{right:450px;top:94px;display:grid;border-radius:12px;overflow:hidden}.zoom span{width:38px;height:38px;display:grid;place-items:center}.zoom span+span{border-top:1px solid var(--line)}
+.ramp{left:390px;bottom:20px;width:270px;padding:10px 14px;border-radius:14px;font-size:12px;color:var(--mut)}
+.ramp i{display:block;height:8px;border-radius:4px;margin:7px 0 5px;background:linear-gradient(90deg,var(--r),var(--o),var(--y),var(--g),var(--gg))}
+.ramp div{display:flex;justify-content:space-between}
+.src{right:450px;bottom:20px;padding:6px 11px;border-radius:10px;font-size:12px}
+.chip{position:absolute;display:flex;gap:7px;align-items:center;background:rgba(14,17,15,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:5px 10px;font-size:13px;font-weight:700}
+.chip span{font-weight:600}
+.dn{color:#FFB25E}.hot{color:#FF8E73}.ok{color:#9BE05E}
+</style></head><body>
+<div class="map"><svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+ <defs>
+  <linearGradient id="n1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4E64C"/><stop offset=".45" stop-color="#86D24A"/><stop offset=".7" stop-color="#FFA23A"/><stop offset=".9" stop-color="#FF5A4E"/></linearGradient>
+  <linearGradient id="n2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2FB15A"/><stop offset=".6" stop-color="#86D24A"/><stop offset="1" stop-color="#C9DF4A"/></linearGradient>
+  <linearGradient id="n3" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2FB15A"/><stop offset="1" stop-color="#86D24A"/></linearGradient>
+ </defs>
+ <path d="M380 470 L1060 440" stroke="#CDBF9E" stroke-opacity=".7" stroke-width="7"/>
+ <path d="M760 90 L790 900" stroke="#CDBF9E" stroke-opacity=".5" stroke-width="5"/>
+ <circle cx="1000" cy="720" r="95" fill="#4C6B3A" fill-opacity=".6" stroke="#CDBF9E" stroke-opacity=".4"/>
+ <polygon points="440,500 730,488 742,800 452,812" fill="url(#n1)" fill-opacity=".78" stroke="#fff" stroke-width="2.5"/>
+ <polygon points="820,480 1010,470 1018,640 828,652" fill="url(#n2)" fill-opacity=".72" stroke="#fff" stroke-width="2"/>
+ <polygon points="450,170 735,160 742,430 458,438" fill="url(#n3)" fill-opacity=".72" stroke="#fff" stroke-width="2"/>
+ <polygon points="820,180 990,175 996,420 826,428" fill="none" stroke="#fff" stroke-opacity=".35" stroke-dasharray="6 6"/>
+</svg>
+<div class="chip" style="left:520px;top:520px">North Field <span class="dn">0.41</span></div>
+<div class="chip" style="left:850px;top:500px">Creek Field <span class="ok">0.66</span></div>
+<div class="chip" style="left:530px;top:200px">South Field <span class="ok">0.58</span></div>
+</div>
+
+<header class="glass top">
+ <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 21c0-7 3-12 9-15-1 8-4 13-9 15Z" fill="#C6F24E"/><path d="M12 21C12 15 9.5 10.5 3 8c.6 7 3.6 11.4 9 13Z" fill="#5CC8FF"/></svg>AgroMind</div>
+ <div class="farm">Demo Farm <span>Story County, Iowa</span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5l3-3" stroke="#B9C2BB" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></div>
+ <nav class="tabs"><a class="on">Command Center</a><a>Simulator</a><a>Farm profile</a></nav>
+ <div class="pill"><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#FFA23A"/></svg>1 finding</div>
+ <div class="ask"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 3h10v7H7l-3 3v-3H3z" fill="#15210A"/></svg>Ask the advisor</div>
+</header>
+
+<div class="glass lay"><span>Satellite</span><span class="on">Greenness</span><span>Rainfall</span><span>Heat</span></div>
+<div class="glass zoom"><span><svg width="12" height="12"><path d="M6 1v10M1 6h10" stroke="#F2F5F0" stroke-width="1.6"/></svg></span><span><svg width="12" height="12"><path d="M1 6h10" stroke="#F2F5F0" stroke-width="1.6"/></svg></span></div>
+<div class="glass ramp">Greenness (NDVI)<i></i><div><span>0.0 bare soil</span><span>0.5</span><span>0.9 dense crop</span></div></div>
+<div class="glass src">MODIS · Aug 29 · Imagery © Esri</div>
+
+<aside class="glass left">
+ <div class="lh"><b>Fields</b><span>3 fields · 93 ha</span></div>
+ <div class="f on"><svg width="40" height="32"><defs><linearGradient id="t1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4E64C"/><stop offset=".7" stop-color="#FFA23A"/><stop offset="1" stop-color="#FF5A4E"/></linearGradient></defs><polygon points="3,4 36,2 37,29 4,30" fill="url(#t1)" stroke="#fff" stroke-width="1.5"/></svg><div><div class="n">North Field</div><div class="s">Maize · 40 ha</div></div><div class="v">0.41<small class="dn">−18% vs normal</small></div></div>
+ <div class="ind">
+  <div class="ir"><div class="n"><i class="dot" style="background:var(--sky)"></i>Rainfall, 30 days</div><div class="k">Observed · NASA POWER</div><div class="v">38 mm<small class="dn">−59%</small></div><div class="trk"><i style="width:28%;background:var(--sky)"></i><b style="left:68%"></b></div></div>
+  <div class="ir"><div class="n"><i class="dot" style="background:var(--coral)"></i>Max temperature</div><div class="k">Observed · NASA POWER</div><div class="v">33.4 °C<small class="hot">+4.3 °C</small></div><div class="trk"><i style="width:82%;background:var(--coral)"></i><b style="left:64%"></b></div></div>
+  <div class="ir"><div class="n"><i class="dot" style="background:var(--violet)"></i>Water use (ET)</div><div class="k">Observed · NASA POWER</div><div class="v">4.9 mm/d<small class="hot">+17%</small></div><div class="trk"><i style="width:70%;background:var(--violet)"></i><b style="left:60%"></b></div></div>
+  <div class="ir"><div class="n"><i class="dot" style="background:var(--amber)"></i>Soil</div><div class="k">Modelled · SoilGrids</div><div class="v">Loam<small style="color:var(--mut)">pH 6.5</small></div></div>
+ </div>
+ <div class="strip"><div class="h">Greenness vs normal, weekly <span>Apr 28 – Aug 30</span></div>
+  <div class="bars"><i style="background:var(--g)"></i><i style="background:var(--g)"></i><i style="background:var(--gg)"></i><i style="background:var(--g)"></i><i style="background:var(--g)"></i><i style="background:var(--gg)"></i><i style="background:var(--g)"></i><i style="background:var(--g)"></i><i style="background:var(--y)"></i><i style="background:var(--g)"></i><i style="background:var(--g)"></i><i style="background:var(--y)"></i><i style="background:var(--y)"></i><i style="background:var(--o)"></i><i style="background:var(--o)"></i><i style="background:var(--o)"></i><i style="background:var(--r)"></i><i style="background:var(--o)"></i></div>
+  <div class="axis"><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span></div></div>
+ <div class="f" style="margin-top:8px"><svg width="40" height="32"><polygon points="2,6 37,3 38,26 6,30" fill="url(#n2)" stroke="#fff" stroke-width="1.5"/></svg><div><div class="n">Creek Field</div><div class="s">Soybean · 22 ha</div></div><div class="v">0.66<small class="ok">+2%</small></div></div>
+ <div class="f"><svg width="40" height="32"><polygon points="4,3 36,5 34,28 3,26" fill="url(#n3)" stroke="#fff" stroke-width="1.5"/></svg><div><div class="n">South Field</div><div class="s">Wheat · 31 ha</div></div><div class="v">0.58<small class="ok">−3%</small></div></div>
+</aside>
+
+<aside class="glass right">
+ <div class="fd"><div class="hd"><h2>Possible water stress</h2><span class="badge">Watch</span></div>
+  <div class="w">North Field · since Jul 18</div>
+  <p>Greenness is 18% below this field's normal while rain ran 59% short and heat stayed high. Water stress may be one explanation. Satellites can't rule out pests or disease.</p>
+  <div class="c"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7.5" stroke="#FFA23A" stroke-width="1.6" fill="none"/><path d="M5.5 9.2 8 11.5l4.5-5" stroke="#FFA23A" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>Check soil moisture at 15 cm in the north-east corner before irrigating.</div></div>
+ <div class="ch"><div class="hd">Greenness this season <span class="tag">OBSERVED</span></div>
+  <div class="leg"><span><b style="background:var(--lime)"></b>2026</span><span><b style="background:var(--sky)"></b>2025</span><span><b style="background:var(--violet)"></b>2024</span><span><b style="background:#8E978F"></b>10-yr normal</span></div>
+  <svg viewBox="0 0 382 210" width="382" height="210">
+   <defs><linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C6F24E" stop-opacity=".35"/><stop offset="1" stop-color="#C6F24E" stop-opacity="0"/></linearGradient></defs>
+   <g stroke="rgba(255,255,255,.08)"><line x1="30" y1="20" x2="382" y2="20"/><line x1="30" y1="75" x2="382" y2="75"/><line x1="30" y1="130" x2="382" y2="130"/><line x1="30" y1="185" x2="382" y2="185"/></g>
+   <g fill="#B9C2BB" font-size="12" font-family="Figtree"><text x="0" y="24">0.8</text><text x="0" y="79">0.6</text><text x="0" y="134">0.4</text><text x="0" y="189">0.2</text></g>
+   <path d="M30 178 C90 152 145 64 205 48 S310 58 382 102 L382 128 C310 86 258 76 205 78 S90 172 30 186Z" fill="#8E978F" fill-opacity=".22"/>
+   <polyline points="30,182 92,152 145,86 205,60 268,66 330,86 382,110" fill="none" stroke="#8E978F" stroke-width="2" stroke-dasharray="4 4"/>
+   <polyline points="30,180 92,148 145,76 205,50 268,56 330,80 382,106" fill="none" stroke="#5CC8FF" stroke-width="1.6" stroke-opacity=".9"/>
+   <polyline points="30,184 92,158 145,94 205,68 268,72 330,96 382,118" fill="none" stroke="#B79BFF" stroke-width="1.6" stroke-opacity=".9"/>
+   <path d="M30 181 L92 150 L145 80 L205 61 L248 76 L290 106 L330 128 L330 195 L30 195Z" fill="url(#a)"/>
+   <polyline points="30,181 92,150 145,80 205,61 248,76 290,106 330,128" fill="none" stroke="#C6F24E" stroke-width="3" stroke-linejoin="round"/>
+   <line x1="238" y1="20" x2="238" y2="195" stroke="#FFA23A" stroke-dasharray="3 4"/>
+   <rect x="244" y="24" width="122" height="22" rx="6" fill="rgba(255,162,58,.18)"/><text x="252" y="39" fill="#FFC07A" font-size="12" font-family="Figtree" font-weight="700">Decline from Jul 18</text>
+   <circle cx="330" cy="128" r="6" fill="#C6F24E" stroke="#0E110F" stroke-width="2"/>
+  </svg>
+  <div class="axis"><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div></div>
+ <div style="margin-top:auto;font-size:12px;color:var(--mut);line-height:1.45">Demo farm with sample data. Observed values come from NASA satellites; Modelled values are estimates.</div>
+</aside>
+</body></html>
