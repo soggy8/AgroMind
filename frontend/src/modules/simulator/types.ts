@@ -3,6 +3,7 @@
 export type Kind = "observed" | "modelled" | "scenario";
 export type IrrigationMode = "none" | "limited" | "full";
 export type HeatResponse = "published" | "local";
+export type Units = "metric" | "us";
 export type IndicatorId = "yield" | "water" | "risk" | "soil" | "margin";
 
 export const MAX_ROTATIONS = 4;
@@ -17,12 +18,14 @@ export interface Scenario {
   years: number; // 1 .. 10
   price_change_pct: number; // -40 .. 40, economics only
   heat_response: HeatResponse; // published US average (default) or this county's history
+  projection: string | null; // NASA NEX-GDDP-CMIP6 id, e.g. "ssp245_2050s"; replaces the sliders
 }
 
 export interface RotationInput {
   id: string;
   name: string;
   crops: string[]; // crop ids, 1 .. 6
+  cover_crop?: boolean; // cereal rye over winter before spring crops
 }
 
 export type Priorities = Record<IndicatorId, number>;
@@ -33,6 +36,7 @@ export interface SimulationRequest {
   scenario: Scenario;
   priorities: Priorities | null; // null = use the farm's priorities
   include_economics: boolean;
+  units: Units; // only changes generated sentences; numbers are always metric
 }
 
 // ---------- outputs ----------
@@ -107,12 +111,41 @@ export interface RotationResult {
   rain_sufficiency: Stat;
   stress_season_frequency: number;
   by_start_year: number[]; // aligned with SimulationResult.ensemble_start_years
+  track_seasons: number[][]; // [track][season] relative yield
+  cover_crop: boolean;
   vs_baseline: VsBaseline;
   soil: SoilIndex;
   economics: Economics | null;
   indicator_scores: Partial<Record<IndicatorId, number>>;
   score: number;
   rank: number;
+}
+
+export interface YearClimate {
+  year: number;
+  rain_mm: number;
+  scenario_rain_mm: number;
+  tmax_c: number;
+  scenario_tmax_c: number;
+  hot_days: number;
+  scenario_hot_days: number;
+}
+
+export interface Range {
+  median: number;
+  min: number;
+  max: number;
+}
+
+export interface ProjectionInfo {
+  id: string;
+  ssp: string;
+  ssp_name: string;
+  period: string;
+  years: string;
+  models: number;
+  temp_change_c: Range;
+  rain_change_pct: Range;
 }
 
 export interface Recommendation {
@@ -144,6 +177,8 @@ export interface SimulationResult {
   assumptions: Assumption[];
   ensemble_size: number;
   ensemble_start_years: number[];
+  yearly_climate: YearClimate[];
+  projection: ProjectionInfo | null;
   economics_included: boolean;
   data_note: string;
   model_version: string;
@@ -192,6 +227,8 @@ export interface SimulatorOptions {
   scenario_presets: ScenarioPreset[];
   default_priorities: Priorities;
   default_irrigation: IrrigationMode;
+  projections: ProjectionInfo[];
+  projection_source: string | null;
 }
 
 // ---------- saved runs ----------
@@ -221,4 +258,70 @@ export interface AdvisorContext {
   instructions: string;
   facts: string[];
   suggested_questions: string[];
+}
+
+// ---------- rotation finder ----------
+
+export interface FinderRequest {
+  field_id: string;
+  scenario: Scenario;
+  priorities: Priorities | null;
+  include_economics: boolean;
+  crops?: string[] | null;
+  max_length?: number;
+  cover_crop?: boolean;
+  top?: number;
+  units: Units;
+}
+
+export interface FinderResult {
+  kind: "modelled";
+  candidates_tested: number;
+  rotations: RotationResult[];
+  recommendation: Recommendation;
+  data_note: string;
+}
+
+// ---------- irrigation planner ----------
+
+export interface IrrigationPlanRequest {
+  field_id: string;
+  rotation: RotationInput;
+  scenario: Scenario;
+  target_share: number;
+  units: Units;
+}
+
+export interface IrrigationPoint {
+  cap_mm: number | null; // per season; null = no limit
+  relative_yield: Stat;
+  irrigation_mm_per_year: number;
+  water_cost_per_ha_year: number;
+  stress_season_frequency: number;
+}
+
+export interface IrrigationPlan {
+  kind: "modelled";
+  rotation_name: string;
+  target_share: number;
+  points: IrrigationPoint[];
+  recommended_cap_mm: number | null;
+  reaches_target: boolean;
+  summary: string;
+  cost_source: string;
+}
+
+// ---------- shared AI advisor (/api/advisor) ----------
+
+export interface AdvisorTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AdvisorAnswer {
+  answer: string;
+  cited_facts: number[];
+  grounded: boolean;
+  model: string;
+  refused: boolean;
 }

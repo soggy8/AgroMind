@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.modules.croptwin.router import router as croptwin_router
 from app.modules.simulator.router import router as simulator_router
+from app.shared.advisor.router import router as advisor_router
 from app.shared.db import check_connection
 
 
@@ -29,7 +30,8 @@ def create_app() -> FastAPI:
 
     app.include_router(croptwin_router)
     app.include_router(simulator_router)
-    # CropDoctor (/api/farms/{farm_id}/health) and the advisor (/api/advisor) mount here when they exist.
+    app.include_router(advisor_router)
+    # CropDoctor (/api/farms/{farm_id}/health) mounts here when it exists.
 
     @app.get("/api/health", tags=["meta"])
     def health() -> dict:

@@ -37,6 +37,25 @@ If port 8000 is taken, run the API on another port and start Vite with
 
 ---
 
+## 1b. Features
+
+| Feature | Where | Notes |
+|---|---|---|
+| Rotation comparison | main run | up to 4 rotations, ranked by the farmer's priorities, reasons and trade-offs |
+| NASA climate projections | Scenario > "NASA projection" | NEX-GDDP-CMIP6, 6 models, SSP2-4.5 / SSP5-8.5, 2050s / 2080s, monthly delta method (section 4) |
+| Response to heat | Scenario | "US research" (Zhao et al. 2017, default) or "This county"; results always show both |
+| Replay a year | Results > Replay | any starting year (default: driest), weather and season-by-season yields; click a year on the chart |
+| Rotation finder | "Suggest the best rotations" | every crop cycle up to 3 crops (`POST .../find`); priced crops only when economics is on |
+| Irrigation planner | droplet button next to Run | yield vs seasonal cap, least water for a target (`POST .../irrigation-plan`) |
+| Cover crops | per rotation | cereal rye: spring water use, 2% maize factor, $35/ac, +15 soil index (all labelled assumptions) |
+| Saved runs + compare | Results > Saved | database table; tick two runs to compare side by side |
+| Units | top bar Metric / US | numbers stay metric in the API; sentences follow `units` in the request |
+| Explanations + tour | (i) buttons, ? in top bar | tour starts once on first desktop visit (`agromind.tour.simulator-v1` in localStorage) |
+| Report | Results footer > Report | print view, "Save as PDF" in the browser |
+| AI advisor | top bar > Ask the advisor | `shared/advisor`, Claude (`claude-opus-5-5`), answers only from numbered facts and cites them; needs `ANTHROPIC_API_KEY` or `LLM_API_KEY` |
+
+---
+
 ## 2. Design decisions
 
 1. **Transparent rules, no ML.** FAO-56 crop water requirements (Penman-Monteith ET0, Kc curve,
@@ -95,7 +114,10 @@ backend/app/modules/simulator/
 |---|---|---|
 | GET | `/api/farms/{farm_id}/simulations/options` | → `SimulatorOptions` (farm, fields with boundaries, crops, presets, defaults) |
 | POST | `/api/farms/{farm_id}/simulations/run` | `SimulationRequest` → `SimulationResult` |
+| POST | `/api/farms/{farm_id}/simulations/find` | `FinderRequest` → `FinderResult` |
+| POST | `/api/farms/{farm_id}/simulations/irrigation-plan` | `IrrigationPlanRequest` → `IrrigationPlan` |
 | POST | `/api/farms/{farm_id}/simulations/advisor-context` | `SimulationResult` → `AdvisorContext` |
+| POST | `/api/advisor/ask` (shared) | facts + question + history → answer with cited fact numbers |
 | POST | `/api/farms/{farm_id}/simulations` | `SaveRunRequest` → `SavedRun` (201) |
 | GET | `/api/farms/{farm_id}/simulations` | → `SavedRunSummary[]` |
 | GET | `/api/farms/{farm_id}/simulations/{run_id}` | → `SavedRun` |
@@ -112,8 +134,13 @@ degrees: regional weather, not the field's own. The demo farm's cell is committe
 `data/samples/power_daily_story_county_ia_2001_2025.csv`; other locations are fetched live and
 cached under `data/cache/power/`.
 
-**Scenario.** +dT on Tmax and Tmin every day; rain x (1 + dR). Humidity, wind and radiation stay
-as observed. ET0 is recomputed from the shifted temperatures.
+**Scenario.** Sliders: +dT on Tmax and Tmin every day; rain x (1 + dR). NASA projection: per calendar
+month, the median across 6 NEX-GDDP-CMIP6 models (ACCESS-CM2, GFDL-ESM4, IPSL-CM6A-LR, MPI-ESM1-2-HR,
+MRI-ESM2-0, NorESM2-MM) of the change in Tmax and Tmin and the percent change in rain, future period
+minus 1995-2014, every 3rd year sampled. Saved for the demo cell in
+`data/samples/nex_gddp_cmip6_story_county_ia.json`; regenerate or add a location with
+`python -m app.modules.simulator.projections --lat .. --lon ..` (about 10 minutes, NASA NCCS THREDDS).
+Humidity, wind and radiation stay as observed. ET0 is recomputed from the shifted temperatures.
 
 **ET0.** FAO-56 Penman-Monteith with mean RH. Tested against FAO-56 Example 18 (3.9 mm/day).
 May-Sep average on the sample: 654 mm.
@@ -237,7 +264,7 @@ Every service function takes the request's database session, like CropTwin's.
 ## 8. Still to do
 
 1. Swap `ports.load_climate` to the shared POWER connector once it exists.
-2. Connect the advisor drawer to `shared/advisor` once it exists.
+2. Fetch projections for new locations on demand (today only the demo cell is saved).
 3. Calibrate more: soybean timing, a second county, and the heat rule against a published
    sensitivity.
 4. Replace ASSUME values (oats costs, planting dates, non-maize rotation penalties) with sources.

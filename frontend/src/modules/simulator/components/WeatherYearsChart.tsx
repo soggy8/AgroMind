@@ -7,7 +7,7 @@ import type { SimulationResult } from "../types";
  * How each rotation fares depending on which historical year the run starts in: the spread behind
  * the p10–p90 ranges. A run starting in 2012 meets the 2012 drought in its first season.
  */
-export function WeatherYearsChart({ result }: { result: SimulationResult }) {
+export function WeatherYearsChart({ result, onYear }: { result: SimulationResult; onYear?: (year: number) => void }) {
   const rots = [...result.rotations].sort((a, b) => a.input_index - b.input_index);
   const data = result.ensemble_start_years.map((year, i) => {
     const row: Record<string, number> = { year };
@@ -20,11 +20,12 @@ export function WeatherYearsChart({ result }: { result: SimulationResult }) {
   return (
     <section aria-labelledby="years-h">
       <h3 id="years-h" className="text-[15px] font-bold">By starting weather year</h3>
-      <p className="text-[12px] text-mut">Average yield over the run, if it starts in that year&apos;s weather.</p>
+      <p className="text-[12px] text-mut">Average yield over the run, if it starts in that year&apos;s weather.{onYear && " Click a year to replay it."}</p>
       <div className="mt-2 h-[170px]" role="img"
         aria-label={`Line chart of yield by starting weather year for ${rots.length} rotations`}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+          <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} style={onYear ? { cursor: "pointer" } : undefined}
+            onClick={(e) => { const y = Number(e?.activeLabel); if (onYear && Number.isFinite(y)) onYear(y); }}>
             <CartesianGrid stroke="rgb(255 255 255 / .08)" vertical={false} />
             <XAxis dataKey="year" tick={{ fill: "var(--color-mut)", fontSize: 12 }} tickLine={false}
               axisLine={false} interval={5} />

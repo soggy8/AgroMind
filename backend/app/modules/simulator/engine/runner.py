@@ -9,7 +9,8 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 
-from ..parameters import CROPS, DAYS_PER_YEAR, FALLOW_KC, FALLOW_ROOT_DEPTH_M
+from ..parameters import (COVER_CROP_MAIZE_FACTOR, COVER_CROP_SPRING_KC, COVER_CROP_START_DOY,
+                          COVER_CROP_TERMINATE_DAYS, CROPS, DAYS_PER_YEAR, FALLOW_KC, FALLOW_ROOT_DEPTH_M)
 from . import crop_models, water_balance
 from .types import Climate, EnsembleOutcome, Planting, SoilProfile
 
@@ -18,7 +19,7 @@ def run(soil: SoilProfile, plantings: Sequence[Planting], climate: Climate, et0:
         years: int, irrigation: str = "none", irrigation_cap_mm: float | None = None,
         typical_factor: Mapping[str, float] | None = None,
         root_depth_scale: float = 1.0,
-        heat_loss_per_degday: float | None = None) -> EnsembleOutcome:
+        heat_loss_per_degday: float | None = None, cover_crop: bool = False) -> EnsembleOutcome:
     """Simulate `years` calendar years of the schedule on every ensemble track.
 
     `typical_factor[crop_id]` is the crop's mean water x heat factor under today's climate; dividing
@@ -31,6 +32,12 @@ def run(soil: SoilProfile, plantings: Sequence[Planting], climate: Climate, et0:
     season_of_day = np.full(horizon, -1, dtype=int)
     for i, pl in enumerate(plantings):
         season_of_day[pl.plant_day:min(pl.harvest_day, horizon)] = i
+
+    fallow_kc = np.full(horizon, FALLOW_KC)
+    if cover_crop:
+        for pl in cover_crop_plantings(plantings):
+            start = (pl.plant_day // DAYS_PER_YEAR) * DAYS_PER_YEAR + COVER_CROP_START_DOY
+            fallow_kc[max(start, 0):max(pl.plant_day - COVER_CROP_TERMINATE_DAYS, 0)] = COVER_CROP_SPRING_KC
 
     crops = [CROPS[pl.crop_id] for pl in plantings]
     kc_by_season = [crop_models.kc_on_day(c, np.arange(c.season_days)) for c in crops]
@@ -52,7 +59,7 @@ def run(soil: SoilProfile, plantings: Sequence[Planting], climate: Climate, et0:
         if s < 0:
             depletion, _ = water_balance.step(depletion, et0=e0, kc=0.0, rain=rain, taw=fallow_taw, p=1.0,
                                               in_season=False, irrigate=False, irrigation_left=None,
-                                              fallow_kc=FALLOW_KC)
+                                              fallow_kc=float(fallow_kc[t]))
             continue
 
         crop, pl = crops[s], plantings[s]
@@ -80,7 +87,9 @@ def run(soil: SoilProfile, plantings: Sequence[Planting], climate: Climate, et0:
         if n_seasons else np.zeros(shape)
     hf = crop_models.heat_factor(acc["hdd"]) if heat_loss_per_degday is None \
         else crop_models.heat_factor(acc["hdd"], heat_loss_per_degday)
-    rot = np.array([[crop_models.rotation_factor(c, pl.predecessor_crop_id)] * n_tracks
+    covered = {pl.season_index for pl in cover_crop_plantings(plantings)} if cover_crop else set()
+    rot = np.array([[crop_models.rotation_factor(c, pl.predecessor_crop_id)
+                     * (COVER_CROP_MAIZE_FACTOR if (pl.season_index in covered and c.id == "maize") else 1.0)] * n_tracks
                     for c, pl in zip(crops, plantings)]).reshape(shape)
     norm = np.array([[(typical_factor or {}).get(pl.crop_id, 1.0)] for pl in plantings]).reshape(n_seasons, 1) \
         if n_seasons else np.ones((0, 1))
@@ -93,6 +102,12 @@ def run(soil: SoilProfile, plantings: Sequence[Planting], climate: Climate, et0:
         water_factor=wf, heat_factor=hf, rotation_factor=rot, relative_yield=relative,
         start_years=tuple(climate.years),
     )
+
+
+def cover_crop_plantings(plantings: Sequence[Planting]) -> list[Planting]:
+    """Spring-planted seasons that a fall-seeded rye cover crop can precede (not fall-planted winter wheat)."""
+    return [pl for pl in plantings if pl.plant_day % DAYS_PER_YEAR < 200
+            and pl.plant_day % DAYS_PER_YEAR - COVER_CROP_TERMINATE_DAYS > COVER_CROP_START_DOY]
 
 
 def single_season(crop_id: str, predecessor: str | None = None) -> list[Planting]:

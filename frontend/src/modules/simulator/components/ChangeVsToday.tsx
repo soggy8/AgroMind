@@ -1,3 +1,4 @@
+import { InfoTip } from "../../../shared/components";
 import { isTodayClimate, pct, pctRange, signed } from "../lib/format";
 import { rotationColor } from "../lib/rotationColors";
 import type { SimulationResult } from "../types";
@@ -11,7 +12,14 @@ export function ChangeVsToday({ result }: { result: SimulationResult }) {
   return (
     <section aria-labelledby="change-h">
       <div className="flex items-baseline justify-between">
-        <h3 id="change-h" className="text-[15px] font-bold">{today ? "Yield in today's climate" : "Change vs today's climate"}</h3>
+        <h3 id="change-h" className="flex items-center gap-0.5 text-[15px] font-bold">
+          {today ? "Yield in today's climate" : "Change vs today's climate"}
+          <InfoTip label="Change vs today's climate">
+            Each rotation is run twice on the same 25 weather years: once as they were, once with the scenario. The
+            big number is the difference. "Typical" is the crop's average yield today; the range covers the worst
+            10% to the best 10% of years.
+          </InfoTip>
+        </h3>
         <span className="text-[12px] text-mut">p50, range p10–p90</span>
       </div>
       <ul className="mt-1">

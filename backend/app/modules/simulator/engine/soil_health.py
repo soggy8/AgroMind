@@ -6,7 +6,7 @@ carbon or any measured property.
 """
 from __future__ import annotations
 
-from ..parameters import CROPS
+from ..parameters import COVER_CROP_SOIL_POINTS, CROPS
 
 DIVERSITY_POINTS = {1: 0, 2: 15, 3: 25}   # distinct crops; 4+ gets 30
 FAMILY_BONUS = 5
@@ -16,7 +16,7 @@ RESIDUE_WEIGHT = {"high": 1.0, "medium": 0.5, "low": 0.0}
 REPEAT_PENALTY = 15
 
 
-def rotation_soil_index(crops: list[str]) -> tuple[int, dict[str, int], list[str]]:
+def rotation_soil_index(crops: list[str], cover_crop: bool = False) -> tuple[int, dict[str, int], list[str]]:
     cycle = [CROPS[c] for c in crops]
     distinct = {c.id for c in cycle}
     families = {c.family for c in cycle}
@@ -26,7 +26,8 @@ def rotation_soil_index(crops: list[str]) -> tuple[int, dict[str, int], list[str
     residue = round(RESIDUE_POINTS * sum(RESIDUE_WEIGHT[c.residue] for c in cycle) / len(cycle))
     repeats = sum(1 for a, b in zip(cycle, cycle[1:] + cycle[:1]) if a.id == b.id)
     penalty = -round(REPEAT_PENALTY * repeats / len(cycle))
-    score = max(0, min(100, diversity + legume + residue + penalty))
+    cover = COVER_CROP_SOIL_POINTS if cover_crop else 0
+    score = max(0, min(100, diversity + legume + residue + penalty + cover))
 
     notes = [
         f"{len(distinct)} different crop{'s' if len(distinct) > 1 else ''} from {len(families)} "
@@ -36,4 +37,7 @@ def rotation_soil_index(crops: list[str]) -> tuple[int, dict[str, int], list[str
     ]
     if penalty:
         notes.append("A crop follows itself, which raises pest pressure and lowers yield")
-    return score, {"diversity": diversity, "legume": legume, "residue": residue, "continuous_penalty": penalty}, notes
+    if cover:
+        notes.append("Cereal rye cover crop over winter: protects soil and holds nitrogen")
+    return score, {"diversity": diversity, "legume": legume, "residue": residue, "continuous_penalty": penalty,
+                   "cover_crop": cover}, notes

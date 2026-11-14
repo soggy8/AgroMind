@@ -1,33 +1,47 @@
-import { CloudSun, FlaskConical, RefreshCw, Sprout } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { CloudSun, FileDown, FlaskConical, RefreshCw, Sprout } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { KindTag, SegmentedTabs, Skeleton } from "../../../shared/components";
-import { scenarioSummary } from "../lib/format";
-import type { useSimulator } from "../state/useSimulator";
+import { useUnits } from "../../../shared/units";
+import { signed } from "../lib/format";
+import type { Sim } from "../state/useSimulator";
 import type { SimulatorOptions } from "../types";
 import { AssumptionsList } from "./AssumptionsList";
 import { ChangeVsToday } from "./ChangeVsToday";
 import { ClimateCompare } from "./ClimateCompare";
 import { IndicatorBars } from "./IndicatorBars";
 import { RecommendationBlock } from "./RecommendationBlock";
+import { ReplayView } from "./ReplayView";
 import { SavedRuns } from "./SavedRuns";
 import { SeasonTable } from "./SeasonTable";
 // Recharts is only needed once there is a result, so it loads in its own chunk.
 const WeatherYearsChart = lazy(() => import("./WeatherYearsChart").then((m) => ({ default: m.WeatherYearsChart })));
 
-type Tab = "compare" | "seasons" | "assumptions" | "saved";
-type Sim = ReturnType<typeof useSimulator>;
+type Tab = "compare" | "seasons" | "replay" | "assumptions" | "saved";
 
 /** Right panel: recommendation first, then the evidence behind it. */
-export function ResultsPanel({ options, sim }: { options: SimulatorOptions; sim: Sim }) {
+export function ResultsPanel({ options, sim, onCompare, onPrint }: {
+  options: SimulatorOptions;
+  sim: Sim;
+  onCompare: (runIds: [string, string]) => void;
+  onPrint: () => void;
+}) {
+  const u = useUnits();
   const [tab, setTab] = useState<Tab>("compare");
   const { state, stale, actions, draft } = sim;
   const result = state.result;
+  const driest = result ? [...result.yearly_climate].sort((a, b) => a.rain_mm - b.rain_mm)[0]?.year : undefined;
+  const [replayYear, setReplayYear] = useState<number | null>(null);
+  useEffect(() => setReplayYear(null), [result]);
+
+  const defaultName = !draft ? "Run" : draft.scenario.projection
+    ? options.projections.find((p) => p.id === draft.scenario.projection)?.ssp_name.split(" (")[0] + `, ${draft.scenario.projection.split("_")[1]}`
+    : `${u.tempDelta(draft.scenario.temp_delta_c)}, ${signed(draft.scenario.rain_change_pct)}% rain`;
 
   const savedSection = (
     <SavedRuns runs={state.savedRuns} error={state.savedError} canSave={!!result && !stale}
-      defaultName={draft ? scenarioSummary(draft.scenario).slice(0, 2).join(", ") : "Run"}
-      onSave={actions.save} onOpen={(id) => { void actions.openSaved(id); setTab("compare"); }}
-      onDelete={(id) => void actions.deleteSaved(id)} />
+      defaultName={defaultName} onSave={actions.save}
+      onOpen={(id) => { void actions.openSaved(id); setTab("compare"); }}
+      onDelete={(id) => void actions.deleteSaved(id)} onCompare={onCompare} />
   );
 
   if (!result) {
@@ -38,6 +52,8 @@ export function ResultsPanel({ options, sim }: { options: SimulatorOptions; sim:
       </div>
     );
   }
+
+  const year = replayYear ?? driest ?? result.ensemble_start_years[0];
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -54,8 +70,8 @@ export function ResultsPanel({ options, sim }: { options: SimulatorOptions; sim:
         )}
         <div className="sticky top-0 z-10 bg-[rgb(16_20_18/.85)] px-[18px] py-3 backdrop-blur-md">
           <SegmentedTabs<Tab> label="Result views" size="sm" value={tab} onChange={setTab}
-            items={[{ id: "compare", label: "Compare" }, { id: "seasons", label: "Seasons" },
-              { id: "assumptions", label: "Assumptions" }, { id: "saved", label: "Saved" }]} />
+            items={[{ id: "compare", label: "Compare" }, { id: "seasons", label: "Seasons" }, { id: "replay", label: "Replay" },
+              { id: "assumptions", label: "Sources" }, { id: "saved", label: "Saved" }]} />
         </div>
         <div className={`space-y-6 px-[18px] pb-5 ${stale || state.running ? "opacity-55" : ""}`}>
           {tab === "compare" && (
@@ -64,26 +80,34 @@ export function ResultsPanel({ options, sim }: { options: SimulatorOptions; sim:
               <ClimateCompare result={result} />
               <IndicatorBars result={result} />
               <Suspense fallback={<Skeleton className="h-[220px] w-full" />}>
-                <WeatherYearsChart result={result} />
+                <WeatherYearsChart result={result} onYear={(y) => { setReplayYear(y); setTab("replay"); }} />
               </Suspense>
             </>
           )}
           {tab === "seasons" && <SeasonTable result={result} crops={options.crops} />}
+          {tab === "replay" && <ReplayView result={result} crops={options.crops} year={year} onYear={setReplayYear} />}
           {tab === "assumptions" && <AssumptionsList result={result} />}
           {tab === "saved" && savedSection}
         </div>
       </div>
-      <p className="border-t border-line px-[18px] py-2.5 text-[12px] leading-snug text-mut">
-        {result.calibrated ? "Demo farm with sample data. " : ""}Weather is observed (NASA POWER); everything else here is modelled.
-      </p>
+      <div className="flex items-center gap-3 border-t border-line px-[18px] py-2.5">
+        <p className="flex-1 text-[12px] leading-snug text-mut">
+          {result.calibrated ? "Demo farm with sample data. " : ""}Weather is observed (NASA POWER); everything else is modelled.
+        </p>
+        <button type="button" onClick={onPrint} disabled={stale}
+          title={stale ? "Run again first: the report shows the current result" : "Print or save as PDF"}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-ctl border border-line bg-glass-hi px-2.5 py-1.5 text-[12px] font-semibold hover:bg-glass-sel disabled:opacity-45">
+          <FileDown size={14} strokeWidth={1.75} /> Report
+        </button>
+      </div>
     </div>
   );
 }
 
 function Intro() {
   const steps = [
-    { icon: Sprout, title: "Pick rotations", text: "Up to four crop sequences for one field." },
-    { icon: CloudSun, title: "Set a scenario", text: "Shift 25 years of observed NASA POWER weather: hotter, drier, irrigated." },
+    { icon: Sprout, title: "Pick rotations", text: "Up to four crop sequences for one field, or let AgroMind suggest the best." },
+    { icon: CloudSun, title: "Set a scenario", text: "Shift 25 years of observed NASA POWER weather yourself, or use NASA climate-model projections." },
     { icon: FlaskConical, title: "Compare", text: "Each rotation is replayed over every weather year and ranked by your priorities." },
   ];
   return (

@@ -28,4 +28,5 @@ export function scenarioSummary(s: Scenario): string[] {
   return parts;
 }
 
-export const isTodayClimate = (s: Scenario) => s.temp_delta_c === 0 && s.rain_change_pct === 0;
+/** True when the scenario leaves the weather unchanged (no sliders moved and no NASA projection). */
+export const isTodayClimate = (s: Scenario) => !s.projection && s.temp_delta_c === 0 && s.rain_change_pct === 0;

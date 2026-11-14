@@ -24,6 +24,9 @@ Earthdata Login is required for SMAP, MODIS, Landsat, GPM (see `.env.example`).
 | USDA NASS county yields via ISU Ag Decision Maker A1-12 | Story County maize 2001-2025, soybean 2016-2025, for calibration | `data/samples/nass_story_county_yields.csv` |
 | ISU Ag Decision Maker A1-20 (2026) | Iowa production costs and budget yields | `simulator/parameters.py` |
 | USDA WASDE, November 2026 | 2026/27 projected farm prices | `simulator/parameters.py` |
+| NASA NEX-GDDP-CMIP6 v2.0 (NCCS THREDDS) | Monthly temperature and rain changes, 6 models, 2 SSPs, 2050s/2080s | `data/samples/nex_gddp_cmip6_story_county_ia.json`; `simulator/projections.py` |
+| Zhao et al. (2017) PNAS; Schlenker & Roberts (2009) PNAS | Published US crop response to warming | `simulator/parameters.py` |
+| Practical Farmers of Iowa; Iowa State University | Cover crop effects and costs | `simulator/parameters.py` |
 
 The NASS Quick Stats API needs a free key; the county yields above were transcribed from ISU's
 published tables instead.

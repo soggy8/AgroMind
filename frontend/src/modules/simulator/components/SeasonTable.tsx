@@ -1,5 +1,6 @@
 import { Droplets, Repeat, Thermometer } from "lucide-react";
 import { KindTag } from "../../../shared/components";
+import { useUnits } from "../../../shared/units";
 import { pct, pctRange } from "../lib/format";
 import { rotationColor } from "../lib/rotationColors";
 import type { CropOption, SeasonResult, SimulationResult } from "../types";
@@ -40,6 +41,7 @@ export function SeasonTable({ result, crops }: { result: SimulationResult; crops
 }
 
 function SeasonRow({ s, cropName }: { s: SeasonResult; cropName: string }) {
+  const u = useUnits();
   const limit = s.limiting_factor === "none" ? null : LIMIT[s.limiting_factor];
   return (
     <li className="grid grid-cols-[52px_1fr_auto] items-center gap-2 rounded-chip bg-glass-hi px-2.5 py-2">
@@ -54,14 +56,14 @@ function SeasonRow({ s, cropName }: { s: SeasonResult; cropName: string }) {
           )}
         </span>
         <span className="block text-[12px] text-mut">
-          {s.plant_date} – {s.harvest_date} · needs {Math.round(s.crop_water_need_mm.p50)} mm
-          {s.irrigation_mm.p50 >= 1 && <> · irrigated {Math.round(s.irrigation_mm.p50)} mm</>}
+          {s.plant_date} – {s.harvest_date} · needs {u.water(s.crop_water_need_mm.p50)}
+          {s.irrigation_mm.p50 >= 1 && <> · irrigated {u.water(s.irrigation_mm.p50)}</>}
         </span>
       </span>
       <span className="text-right">
         <span className="block text-[15px] font-extrabold">{pct(s.relative_yield.p50)}</span>
         <span className="block text-[12px] text-mut">
-          {s.yield_t_ha ? `${s.yield_t_ha.p50.toFixed(1)} t/ha` : pctRange(s.relative_yield)}
+          {s.yield_t_ha ? u.yieldPerArea(s.yield_t_ha.p50, s.crop_id) : pctRange(s.relative_yield)}
         </span>
       </span>
     </li>

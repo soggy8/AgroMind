@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from app.shared.db import get_session
 
 from . import service
-from .schemas import (AdvisorContext, SavedRun, SavedRunSummary, SaveRunRequest, SimulationRequest,
-                      SimulationResult, SimulatorOptions)
+from .schemas import (AdvisorContext, FinderRequest, FinderResult, IrrigationPlan, IrrigationPlanRequest, SavedRun,
+                      SavedRunSummary, SaveRunRequest, SimulationRequest, SimulationResult, SimulatorOptions)
 
 router = APIRouter(prefix="/api/farms/{farm_id}/simulations", tags=["simulator"])
 T = TypeVar("T")
@@ -37,6 +37,18 @@ def get_options(farm_id: str, session: Session = DB):
 @router.post("/run", response_model=SimulationResult)
 def run(farm_id: str, body: SimulationRequest, session: Session = DB):
     return _call(service.run_simulation, session, farm_id, body)
+
+
+@router.post("/find", response_model=FinderResult)
+def find(farm_id: str, body: FinderRequest, session: Session = DB):
+    """Try every crop cycle up to `max_length` and return the best for the farmer's priorities."""
+    return _call(service.find_rotations, session, farm_id, body)
+
+
+@router.post("/irrigation-plan", response_model=IrrigationPlan)
+def irrigation_plan(farm_id: str, body: IrrigationPlanRequest, session: Session = DB):
+    """Yield against seasonal irrigation cap for one rotation, and the smallest cap that reaches the target."""
+    return _call(service.plan_irrigation, session, farm_id, body)
 
 
 @router.post("/advisor-context", response_model=AdvisorContext)

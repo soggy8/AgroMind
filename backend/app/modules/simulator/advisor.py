@@ -25,8 +25,15 @@ def advisor_context(r: SimulationResult) -> AdvisorContext:
     facts = [
         f"Field: {r.field_name}, soil {r.soil}. Simulated {s.years} years, repeated over {r.ensemble_size} historical "
         f"weather years ({r.ensemble_start_years[0]}-{r.ensemble_start_years[-1]}).",
-        f"SCENARIO: temperature {s.temp_delta_c:+.1f} C, rainfall {s.rain_change_pct:+.0f}%, irrigation {s.irrigation}"
-        + (f" (cap {s.irrigation_cap_mm:.0f} mm/season)" if s.irrigation == "limited" else "") + ".",
+        ("SCENARIO: " + (f"NASA NEX-GDDP-CMIP6 projection {r.projection.ssp_name}, {r.projection.years} (median of "
+                          f"{r.projection.models} climate models: growing season {r.projection.temp_change_c['median']:+.1f} C, "
+                          f"models {r.projection.temp_change_c['min']:+.1f} to {r.projection.temp_change_c['max']:+.1f} C; "
+                          f"rain {r.projection.rain_change_pct['median']:+.0f}%)"
+                          if r.projection else f"temperature {s.temp_delta_c:+.1f} C, rainfall {s.rain_change_pct:+.0f}%")
+         + f", irrigation {s.irrigation}"
+         + (f" (cap {s.irrigation_cap_mm:.0f} mm/season)" if s.irrigation == "limited" else "")
+         + (". Response to heat: published US average (Zhao et al. 2017)" if s.heat_response == "published"
+            else ". Response to heat: this county's own 2001-2025 history (smaller than the US average)") + "."),
         f"OBSERVED climate May-Sep: {r.baseline_climate.growing_season_rain_mm:.0f} mm rain, mean max temperature "
         f"{r.baseline_climate.growing_season_tmax_c:.1f} C, {r.baseline_climate.hot_days_per_year:.1f} days at or above 35 C per year "
         f"({r.baseline_climate.source}).",
@@ -34,9 +41,12 @@ def advisor_context(r: SimulationResult) -> AdvisorContext:
         f"{r.scenario_climate.growing_season_tmax_c:.1f} C, {r.scenario_climate.hot_days_per_year:.1f} hot days per year.",
     ]
     for rot in r.rotations:
-        line = (f"MODELLED, rank {rot.rank}: {rot.name}. Yield {_pct(rot.relative_yield.p50)} of typical "
+        name = rot.name + (" with a rye cover crop" if rot.cover_crop else "")
+        line = (f"MODELLED, rank {rot.rank}: {name}. Yield {_pct(rot.relative_yield.p50)} of typical "
                 f"(p10-p90 {_pct(rot.relative_yield.p10)}-{_pct(rot.relative_yield.p90)}), "
-                f"{rot.vs_baseline.relative_yield_change_pct:+.0f}% against today's climate. "
+                f"{rot.vs_baseline.relative_yield_change_pct:+.0f}% against today's climate"
+                + (f" ({rot.vs_baseline.other_heat_response_change_pct:+.0f}% with the other heat-response setting)"
+                   if rot.vs_baseline.other_heat_response_change_pct is not None else "") + ". "
                 f"Poor seasons {_pct(rot.stress_season_frequency)}. Water need met by rain and soil water {_pct(rot.rain_sufficiency.p50)}. "
                 f"Irrigation {rot.irrigation_mm_per_year.p50:.0f} mm/year. Soil index {rot.soil.score}/100.")
         if rot.economics:

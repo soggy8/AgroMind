@@ -1,21 +1,23 @@
 """Simulator orchestration. The only file other modules may import."""
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from functools import lru_cache
 
 import numpy as np
 from sqlalchemy.orm import Session
 
-from . import advisor, ports, ranking, rotations, scenarios, store
+from . import advisor, ports, projections, ranking, rotations, scenarios, store
+from . import units as u
 from .economics import costs, revenue
 from .engine import crop_models, runner, soil_health
 from .engine.types import Climate, EnsembleOutcome, FieldSnapshot
-from .parameters import (CROPS, HEAT_LOSS_PER_DEGDAY, IRRIGATION_COST_SOURCE, MODEL_VERSION,
-                         STRESS_SEASON_THRESHOLD, WARMING_K_PER_DD)
-from .schemas import (AdvisorContext, Assumption, CropOption, Economics, FarmInfo, FieldOption, Priorities,
-                      RotationInput, RotationResult, SavedRun, SavedRunSummary, SeasonResult, SimulationRequest,
-                      SimulationResult, SimulatorOptions, SoilIndex, Stat, VsBaseline)
+from .parameters import (COVER_CROP_SOURCES, CROPS, HEAT_LOSS_PER_DEGDAY, IRRIGATION_COST_SOURCE,
+                         IRRIGATION_COST_USD_PER_MM_HA, MODEL_VERSION, STRESS_SEASON_THRESHOLD, WARMING_K_PER_DD)
+from .schemas import (AdvisorContext, Assumption, CropOption, Economics, FarmInfo, FieldOption, FinderRequest,
+                      FinderResult, IrrigationPlan, IrrigationPlanRequest, IrrigationPoint, Priorities, ProjectionInfo,
+                      RotationInput, RotationResult, SavedRun, SavedRunSummary, Scenario, SeasonResult,
+                      SimulationRequest, SimulationResult, SimulatorOptions, SoilIndex, Stat, VsBaseline)
 
 # Re-exported so the router can map them to HTTP errors.
 NotFound = ports.NotFound
@@ -43,6 +45,8 @@ def get_options(session: Session, farm_id: str) -> SimulatorOptions:
         scenario_presets=scenarios.PRESETS,
         default_priorities=Priorities.model_validate(farm.priorities),
         default_irrigation="none",
+        projections=[ProjectionInfo(**o) for o in projections.options(*farm.center)] if farm.center else [],
+        projection_source="NASA NEX-GDDP-CMIP6 (Thrasher et al. 2022), monthly changes 1995-2014 to future periods",
     )
 
 
@@ -68,60 +72,201 @@ def _typical_factors(field: FieldSnapshot, crop_ids: tuple[str, ...]) -> dict[st
                                   root_depth_scale=field.water_storage_scale)
 
 
+# ---------- shared preparation ----------
+
+@dataclass
+class _Context:
+    farm: ports.FarmView
+    field: FieldSnapshot
+    climate: Climate
+    scen_climate: Climate
+    et0_base: np.ndarray
+    et0_scen: np.ndarray
+    data_note: str
+    projection: ProjectionInfo | None
+
+    @property
+    def scenario_applied(self) -> bool:
+        return self.scen_climate is not self.climate
+
+
+def _prepare(session: Session, farm_id: str, field_id: str, sc: Scenario) -> _Context:
+    farm = ports.get_farm(session, farm_id)
+    field = ports.load_field(session, farm_id, field_id)
+    climate, data_note = ports.load_climate(field.latitude, field.longitude)
+    projection = deltas = None
+    if sc.projection:
+        deltas = projections.monthly_deltas(field.latitude, field.longitude, sc.projection)
+        info = next((o for o in projections.options(field.latitude, field.longitude) if o["id"] == sc.projection), None)
+        if deltas is None or info is None:
+            raise InvalidRotation(f"No saved climate projection '{sc.projection}' for this location.")
+        projection = ProjectionInfo(**info)
+    scen_climate = scenarios.apply(climate, sc, deltas)
+    et0_base = _et0_for(climate, ())
+    scen_key = (sc.projection,) if sc.projection else (sc.temp_delta_c, sc.rain_change_pct)
+    et0_scen = _et0_for(scen_climate, scen_key) if scen_climate is not climate else et0_base
+    return _Context(farm, field, climate, scen_climate, et0_base, et0_scen, data_note, projection)
+
+
+def _simulate(ctx: _Context, crops: list[str], sc: Scenario, cover_crop: bool, typical: dict[str, float], *,
+              irrigation: str | None = None, cap: float | None = None,
+              name: str = "") -> tuple[EnsembleOutcome, EnsembleOutcome, EnsembleOutcome]:
+    """One rotation: (result with the chosen heat response, today's climate, the other heat response)."""
+    plantings = rotations.schedule(crops, sc.years, ctx.field.previous_crop_id)
+    if not plantings:
+        raise InvalidRotation(f"'{name or rotations.rotation_name(crops)}' doesn't fit a single season into "
+                              f"{sc.years} year(s). Add years.")
+    kw = dict(years=sc.years, irrigation=irrigation or sc.irrigation,
+              irrigation_cap_mm=cap if irrigation else sc.irrigation_cap_mm,
+              typical_factor=typical, root_depth_scale=ctx.field.water_storage_scale, cover_crop=cover_crop)
+    local = runner.run(ctx.field.soil, plantings, ctx.scen_climate, ctx.et0_scen, **kw)
+    base = local if not ctx.scenario_applied else runner.run(ctx.field.soil, plantings, ctx.climate, ctx.et0_base, **kw)
+    published = _with_published_warming(local, base)
+    return (published, base, local) if sc.heat_response == "published" else (local, base, published)
+
+
+def _notes(ctx: _Context, rotation_results: list[RotationResult], include_economics: bool) -> str:
+    notes = [ctx.data_note]
+    if ctx.projection:
+        notes.append(f"Scenario: NASA NEX-GDDP-CMIP6 {ctx.projection.ssp_name}, {ctx.projection.years}, median of "
+                     f"{ctx.projection.models} climate models, applied to observed 2001-2025 weather.")
+    notes.append("Model estimates, not forecasts: results show how each rotation responds to past weather "
+                 "shifted by the scenario.")
+    if not ctx.field.calibrated:
+        notes.append("This location is outside the calibrated area, so results are uncalibrated.")
+    if include_economics and any(r.economics is None for r in rotation_results):
+        missing = sorted({CROPS[c].name for r in rotation_results for c in r.crops if not revenue.has_economics(c)})
+        notes.append("Economics left out: " + ", ".join(missing) + " have no cost data.")
+    return " ".join(notes)
+
+
 # ---------- the run ----------
 
 def run_simulation(session: Session, farm_id: str, req: SimulationRequest) -> SimulationResult:
-    farm = ports.get_farm(session, farm_id)
-    field = ports.load_field(session, farm_id, req.field_id)
-    climate, data_note = ports.load_climate(field.latitude, field.longitude)
     for rot in req.rotations:
         rotations.validate(rot.crops)
     if len({r.id for r in req.rotations}) != len(req.rotations):
         raise InvalidRotation("Rotation ids must be unique.")
-
     sc = req.scenario
-    priorities = req.priorities or Priorities.model_validate(farm.priorities)
-    scen_key = (sc.temp_delta_c, sc.rain_change_pct)
-    scen_climate = scenarios.apply(climate, sc)
-    et0_base = _et0_for(climate, ())
-    et0_scen = _et0_for(scen_climate, scen_key) if scen_climate is not climate else et0_base
-
+    ctx = _prepare(session, farm_id, req.field_id, sc)
+    priorities = req.priorities or Priorities.model_validate(ctx.farm.priorities)
     all_crops = tuple(sorted({c for r in req.rotations for c in r.crops}))
-    typical = _typical_factors(field, all_crops)
-    kwargs = dict(years=sc.years, irrigation=sc.irrigation, irrigation_cap_mm=sc.irrigation_cap_mm,
-                  typical_factor=typical, root_depth_scale=field.water_storage_scale)
+    typical = _typical_factors(ctx.field, all_crops)
 
     results = []
     for idx, rot in enumerate(req.rotations):
-        plantings = rotations.schedule(rot.crops, sc.years, field.previous_crop_id)
-        if not plantings:
-            raise InvalidRotation(f"'{rot.name}' doesn't fit a single season into {sc.years} year(s). Add years.")
-        local = runner.run(field.soil, plantings, scen_climate, et0_scen, **kwargs)
-        out_b = local if scen_climate is climate else runner.run(field.soil, plantings, climate, et0_base, **kwargs)
-        published = _with_published_warming(local, out_b)
-        main, other = (published, local) if sc.heat_response == "published" else (local, published)
-        results.append(_rotation_result(idx, rot, main, out_b, other, sc.years, req.include_economics,
+        main, base, other = _simulate(ctx, rot.crops, sc, rot.cover_crop, typical, name=rot.name)
+        results.append(_rotation_result(idx, rot, main, base, other, sc.years, req.include_economics,
                                         sc.price_change_pct))
 
-    ordered, recommendation = ranking.rank(results, priorities, req.include_economics)
-    notes = [data_note, "Model estimates, not forecasts: results show how each rotation responds to past weather "
-                        "shifted by the scenario."]
-    if not field.calibrated:
-        notes.append("This location is outside the calibrated area, so results are uncalibrated.")
-    if req.include_economics and any(r.economics is None for r in ordered):
-        notes.append("Economics left out: " + ", ".join(sorted({CROPS[c].name for r in ordered for c in r.crops
-                                                                if not revenue.has_economics(c)})) + " have no cost data.")
+    ordered, recommendation = ranking.rank(results, priorities, req.include_economics, req.units)
     return SimulationResult(
-        field_id=field.field_id, field_name=field.name, soil=field.soil.description, calibrated=field.calibrated,
-        scenario=sc, priorities=priorities,
-        baseline_climate=scenarios.summarise(climate, et0_base, "observed"),
-        scenario_climate=scenarios.summarise(scen_climate, et0_scen, "scenario"),
+        field_id=ctx.field.field_id, field_name=ctx.field.name, soil=ctx.field.soil.description,
+        calibrated=ctx.field.calibrated, scenario=sc, priorities=priorities,
+        baseline_climate=scenarios.summarise(ctx.climate, ctx.et0_base, "observed"),
+        scenario_climate=scenarios.summarise(ctx.scen_climate, ctx.et0_scen, "scenario"),
         rotations=ordered, recommendation=recommendation,
-        assumptions=_assumptions(field, all_crops, req, scen_climate is not climate),
-        ensemble_size=climate.n_years, ensemble_start_years=list(climate.years),
+        assumptions=_assumptions(ctx, all_crops, req, any(r.cover_crop for r in req.rotations)),
+        ensemble_size=ctx.climate.n_years, ensemble_start_years=list(ctx.climate.years),
+        yearly_climate=scenarios.yearly(ctx.climate, ctx.scen_climate), projection=ctx.projection,
         economics_included=req.include_economics and all(r.economics is not None for r in ordered),
-        data_note=" ".join(notes), model_version=MODEL_VERSION,
+        data_note=_notes(ctx, ordered, req.include_economics), model_version=MODEL_VERSION,
     )
+
+
+# ---------- rotation finder ----------
+
+def candidate_rotations(crops: list[str], max_length: int) -> list[list[str]]:
+    """Every distinct crop cycle up to max_length: continuous crops, and cycles where no crop follows itself.
+
+    Cycles are deduplicated up to rotation (maize-soybean == soybean-maize), keeping the order that
+    starts with the earliest crop in the catalogue.
+    """
+    order = {c: i for i, c in enumerate(CROPS)}
+    seen, out = set(), []
+
+    def canonical(seq):
+        rots = [tuple(seq[i:] + seq[:i]) for i in range(len(seq))]
+        return min(rots, key=lambda r: [order[c] for c in r])
+
+    def extend(seq):
+        if seq:
+            ok = len(seq) == 1 or all(a != b for a, b in zip(seq, seq[1:] + seq[:1]))
+            key = canonical(seq)
+            if ok and key not in seen:
+                seen.add(key)
+                out.append(list(key))
+        if len(seq) < max_length:
+            for c in crops:
+                extend(seq + [c])
+
+    extend([])
+    return out
+
+
+def find_rotations(session: Session, farm_id: str, req: FinderRequest) -> FinderResult:
+    # With economics on, only crops that have Iowa prices and costs can be compared fairly on margin.
+    crops = req.crops or [c for c in CROPS if not req.include_economics or revenue.has_economics(c)]
+    rotations.validate(crops)
+    sc = req.scenario
+    ctx = _prepare(session, farm_id, req.field_id, sc)
+    priorities = req.priorities or Priorities.model_validate(ctx.farm.priorities)
+    typical = _typical_factors(ctx.field, tuple(sorted(set(crops))))
+    results = []
+    for idx, cycle in enumerate(candidate_rotations(crops, req.max_length)):
+        rot = RotationInput(id=f"R{idx + 1}", name=rotations.rotation_name(cycle), crops=cycle, cover_crop=req.cover_crop)
+        try:
+            main, base, other = _simulate(ctx, cycle, sc, req.cover_crop, typical)
+        except InvalidRotation:
+            continue  # e.g. a winter-wheat cycle that doesn't fit the horizon
+        results.append(_rotation_result(idx, rot, main, base, other, sc.years, req.include_economics,
+                                        sc.price_change_pct, slim=True))
+    ordered, recommendation = ranking.rank(results, priorities, req.include_economics, req.units)
+    top = ordered[:req.top]
+    for i, r in enumerate(top):
+        r.input_index = i
+    return FinderResult(candidates_tested=len(results), rotations=top, recommendation=recommendation,
+                        data_note=_notes(ctx, top, req.include_economics))
+
+
+# ---------- irrigation planner ----------
+
+IRRIGATION_CAPS: tuple[float | None, ...] = (0, 25, 50, 75, 100, 150, 200, 300, None)
+
+
+def plan_irrigation(session: Session, farm_id: str, req: IrrigationPlanRequest) -> IrrigationPlan:
+    rotations.validate(req.rotation.crops)
+    sc = req.scenario
+    ctx = _prepare(session, farm_id, req.field_id, sc)
+    typical = _typical_factors(ctx.field, tuple(sorted(set(req.rotation.crops))))
+    points = []
+    for cap in IRRIGATION_CAPS:
+        mode = "none" if cap == 0 else ("full" if cap is None else "limited")
+        main, _, _ = _simulate(ctx, req.rotation.crops, sc, req.rotation.cover_crop, typical,
+                               irrigation=mode, cap=cap, name=req.rotation.name)
+        per_track = main.relative_yield.mean(axis=0)
+        irr = float(np.median(main.irrigation_mm.sum(axis=0) / sc.years))
+        points.append(IrrigationPoint(
+            cap_mm=cap, relative_yield=_stat(per_track, "share of typical"), irrigation_mm_per_year=round(irr, 0),
+            water_cost_per_ha_year=round(irr * IRRIGATION_COST_USD_PER_MM_HA, 0),
+            stress_season_frequency=round(float((main.relative_yield < STRESS_SEASON_THRESHOLD).mean()), 4)))
+    target = req.target_share
+    hit = next((p for p in points if p.relative_yield.p50 >= target), None)
+    pct = f"{target * 100:.0f}%"
+    if hit is None:
+        best = points[-1].relative_yield.p50
+        summary = (f"Even unlimited irrigation keeps {req.rotation.name} at only {best * 100:.0f}% of typical yield in this "
+                   f"scenario, below the {pct} target: heat, not water, is the limit.")
+    elif hit.cap_mm == 0:
+        summary = f"{req.rotation.name} stays at or above {pct} of typical yield without irrigation in this scenario."
+    else:
+        cap_text = "unlimited irrigation" if hit.cap_mm is None else f"up to {u.water(hit.cap_mm, req.units)} per season"
+        summary = (f"{req.rotation.name} needs {cap_text} to stay at {pct} of typical yield: about "
+                   f"{u.water(hit.irrigation_mm_per_year, req.units)} a year on average, costing about "
+                   f"{u.money_per_area(hit.water_cost_per_ha_year, req.units)} in pumping and energy.")
+    return IrrigationPlan(rotation_name=req.rotation.name, target_share=target, points=points,
+                          recommended_cap_mm=None if hit is None else hit.cap_mm, reaches_target=hit is not None,
+                          summary=summary, cost_source=IRRIGATION_COST_SOURCE)
 
 
 def _with_published_warming(o: EnsembleOutcome, base: EnsembleOutcome) -> EnsembleOutcome:
@@ -138,13 +283,16 @@ def _stat(values: np.ndarray, unit: str, digits: int = 3) -> Stat:
 
 def _rotation_result(idx: int, rot: RotationInput, o: EnsembleOutcome, base: EnsembleOutcome,
                      other: EnsembleOutcome, years: int,
-                     include_economics: bool, price_change_pct: float) -> RotationResult:
+                     include_economics: bool, price_change_pct: float, slim: bool = False) -> RotationResult:
+    """Summarise one rotation. `slim` skips the per-track detail (used for finder candidates)."""
     econ_ok = include_economics and all(revenue.has_economics(pl.crop_id) for pl in o.plantings)
     margins = None
     if econ_ok:
         rev = np.stack([revenue.season_revenue(pl.crop_id, o.relative_yield[i], price_change_pct)
                         for i, pl in enumerate(o.plantings)])
-        cost = np.stack([costs.season_cost(pl.crop_id, pl.predecessor_crop_id, o.irrigation_mm[i])
+        covered = {pl.season_index for pl in runner.cover_crop_plantings(o.plantings)} if rot.cover_crop else set()
+        cost = np.stack([costs.season_cost(pl.crop_id, pl.predecessor_crop_id, o.irrigation_mm[i],
+                                           cover_crop=pl.season_index in covered)
                          for i, pl in enumerate(o.plantings)])
         margins = rev - cost
 
@@ -188,7 +336,7 @@ def _rotation_result(idx: int, rot: RotationInput, o: EnsembleOutcome, base: Ens
             + ([f"Prices shifted {price_change_pct:+.0f}% by the scenario."] if price_change_pct else []),
         )
 
-    score, components, notes = soil_health.rotation_soil_index(rot.crops)
+    score, components, notes = soil_health.rotation_soil_index(rot.crops, rot.cover_crop)
     return RotationResult(
         rotation_id=rot.id, input_index=idx, name=rot.name, crops=rot.crops, seasons=seasons,
         relative_yield=_stat(per_track_yield, "share of typical"),
@@ -196,6 +344,8 @@ def _rotation_result(idx: int, rot: RotationInput, o: EnsembleOutcome, base: Ens
         rain_sufficiency=_stat(rain_suff, "share"),
         stress_season_frequency=round(stress, 4),
         by_start_year=[round(float(x), 3) for x in per_track_yield],
+        track_seasons=[] if slim else np.round(o.relative_yield.T, 3).tolist(),
+        cover_crop=rot.cover_crop,
         vs_baseline=VsBaseline(
             relative_yield_change_pct=round(float((per_track_yield.mean() / base_yield.mean() - 1) * 100), 1),
             irrigation_change_mm_per_year=round(float(irr_year.mean() - (base.irrigation_mm.sum(axis=0) / years).mean()), 1),
@@ -208,7 +358,8 @@ def _rotation_result(idx: int, rot: RotationInput, o: EnsembleOutcome, base: Ens
     )
 
 
-def _assumptions(field: FieldSnapshot, crop_ids: tuple[str, ...], req: SimulationRequest, scenario_applied: bool) -> list[Assumption]:
+def _assumptions(ctx: _Context, crop_ids: tuple[str, ...], req: SimulationRequest, cover_crop: bool) -> list[Assumption]:
+    field, scenario_applied = ctx.field, ctx.scenario_applied
     a = [
         Assumption(topic="Crop water use", text="Crop water need = crop coefficient x reference evapotranspiration "
                    "(Penman-Monteith), daily soil water balance.", source="FAO-56 Eq. 6, ch. 6 and 8"),
@@ -241,10 +392,25 @@ def _assumptions(field: FieldSnapshot, crop_ids: tuple[str, ...], req: Simulatio
                             "shows a small response to heat (2012 lost about 12%). Published US averages are "
                             "several times larger; see the other setting.",
                             source="Calibrated against USDA NASS Story County yields"))
-    if scenario_applied:
+    if ctx.projection:
+        p = ctx.projection
+        a.append(Assumption(topic="Climate projection", text=(
+            f"{p.ssp_name}, {p.years}: each month's change in maximum and minimum temperature and percent change in "
+            f"rain, median of {p.models} climate models (growing season {p.temp_change_c['median']:+.1f} C, range "
+            f"{p.temp_change_c['min']:+.1f} to {p.temp_change_c['max']:+.1f}; rain {p.rain_change_pct['median']:+.0f}%), "
+            "added to observed 2001-2025 weather. Changes are relative to 1995-2014, so warming already in the "
+            "observed record is counted slightly twice. Days stay as observed, so changes in heatwave or "
+            "downpour frequency beyond the monthly shift are not captured."),
+            source="NASA NEX-GDDP-CMIP6 v2.0 (Thrasher et al. 2022, Sci. Data 9:262)"))
+    elif scenario_applied:
         a.append(Assumption(topic="Scenario", text="Temperature is added to every day and rain is scaled on every "
                             "wet day. Humidity, wind and sunshine stay as observed. Not a climate projection.",
                             source="Scenario definition"))
+    if cover_crop:
+        a.append(Assumption(topic="Cover crop", text="Cereal rye from fall harvest to 14 days before spring planting. "
+                            + COVER_CROP_SOURCES["water"].removeprefix("ASSUME: ") + "; " + COVER_CROP_SOURCES["maize"]
+                            + " " + COVER_CROP_SOURCES["cost"].removeprefix("ASSUME: ") + ". +15 soil index points.",
+                            source="Practical Farmers of Iowa; Iowa State University; AgroMind assumptions"))
     for cid in crop_ids:
         crop = CROPS[cid]
         flagged = [f"{k.replace('_', ' ')}: {v}" for k, v in crop.sources.items() if v.startswith(("ASSUME", "PROXY"))]

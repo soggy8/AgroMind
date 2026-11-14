@@ -276,3 +276,17 @@ WARMING_K_PER_DD = {"maize": 0.0016, "soybean": 0.0012, "oats": 0.0011, "winter_
 STRESS_SEASON_THRESHOLD = 0.70  # a season below 70% of the crop's typical yield counts as poor
 NEAR_TIE_MARGIN = 0.03
 MODEL_VERSION = "0.2.0"
+
+# ---------- cereal rye cover crop (between a fall harvest and a spring planting) ----------
+COVER_CROP_SPRING_KC = 0.7          # ASSUME: actively growing rye uses water from mid-March until termination
+COVER_CROP_START_DOY = 74           # ~Mar 15
+COVER_CROP_TERMINATE_DAYS = 14      # Iowa State guidance: terminate rye 10-14 days before planting corn
+COVER_CROP_MAIZE_FACTOR = 0.98      # ASSUME: PFI 10-year trials mostly no corn effect; planting too soon costs 5-21 bu/ac
+COVER_CROP_COST_USD_HA = per_acre_to_per_ha(35.0)  # ASSUME: seed + seeding; one Iowa farm reports $26.71/ac net
+COVER_CROP_SOIL_POINTS = 15
+COVER_CROP_SOURCES = {
+    "water": "ASSUME: rye Kc 0.7 from mid-March to termination",
+    "maize": ("Practical Farmers of Iowa / Iowa Learning Farms 10-year on-farm study: mostly no corn or soybean "
+              "yield effect; Iowa State: terminate 10-14 days before corn. Modelled as a 2% maize penalty."),
+    "cost": "ASSUME: $35/ac seed and seeding (an Iowa farm reports $26.71/ac after herbicide savings)",
+}

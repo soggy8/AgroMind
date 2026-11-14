@@ -1,4 +1,5 @@
-import { ArrowRight, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, Plus, Sparkles, Sprout, Trash2, X } from "lucide-react";
+import { InfoTip } from "../../../shared/components";
 import { rotationColor } from "../lib/rotationColors";
 import type { CropOption, RotationInput } from "../types";
 import { MAX_ROTATIONS } from "../types";
@@ -6,18 +7,27 @@ import { MAX_ROTATIONS } from "../types";
 const MAX_CROPS = 6;
 
 /** Up to four rotations, each a sequence of crops. Each rotation keeps its colour everywhere. */
-export function RotationBuilder({ rotations, crops, onCrops, onAdd, onRemove }: {
+export function RotationBuilder({ rotations, crops, onCrops, onCoverCrop, onAdd, onRemove, onSuggest }: {
   rotations: RotationInput[];
   crops: CropOption[];
   onCrops: (rotationId: string, crops: string[]) => void;
+  onCoverCrop: (rotationId: string, on: boolean) => void;
   onAdd: () => void;
   onRemove: (rotationId: string) => void;
+  onSuggest: () => void;
 }) {
   const cropName = (id: string) => crops.find((c) => c.id === id)?.name ?? id;
   return (
-    <section aria-labelledby="rotations-h">
+    <section aria-labelledby="rotations-h" data-tour="rotations">
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 id="rotations-h" className="text-[15px] font-bold">Rotations to compare</h2>
+        <h2 id="rotations-h" className="flex items-center gap-0.5 text-[15px] font-bold">
+          Rotations to compare
+          <InfoTip label="Rotations and cover crops">
+            A rotation is the order crops follow each other on the field, repeated over the years you simulate.
+            A rye cover crop is sown after harvest and ended two weeks before planting: it protects soil over winter
+            and holds nitrogen (+15 soil index), uses some spring water, costs about $35/ac, and can trim maize yield slightly.
+          </InfoTip>
+        </h2>
         <span className="text-[13px] text-mut">{rotations.length} of {MAX_ROTATIONS}</span>
       </div>
       <ul className="space-y-1">
@@ -61,15 +71,27 @@ export function RotationBuilder({ rotations, crops, onCrops, onAdd, onRemove }: 
                 </label>
               )}
             </div>
+            <label className="mt-2 flex w-fit cursor-pointer items-center gap-2 pl-[18px] text-[13px] text-mut hover:text-tx">
+              <input type="checkbox" checked={!!r.cover_crop} onChange={(e) => onCoverCrop(r.id, e.target.checked)}
+                className="h-4 w-4 accent-[var(--color-lime)]" />
+              <Sprout size={14} strokeWidth={1.75} className={r.cover_crop ? "text-ok" : ""} aria-hidden />
+              Rye cover crop over winter
+            </label>
           </li>
         ))}
       </ul>
-      {rotations.length < MAX_ROTATIONS && (
-        <button type="button" onClick={onAdd}
-          className="mt-1 inline-flex items-center gap-1.5 rounded-ctl px-2 py-1.5 text-[13px] font-semibold text-mut hover:bg-glass-hi hover:text-tx">
-          <Plus size={14} strokeWidth={1.75} /> Add rotation
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        {rotations.length < MAX_ROTATIONS && (
+          <button type="button" onClick={onAdd}
+            className="inline-flex items-center gap-1.5 rounded-ctl px-2 py-1.5 text-[13px] font-semibold text-mut hover:bg-glass-hi hover:text-tx">
+            <Plus size={14} strokeWidth={1.75} /> Add rotation
+          </button>
+        )}
+        <button type="button" onClick={onSuggest} data-tour="finder"
+          className="inline-flex items-center gap-1.5 rounded-ctl px-2 py-1.5 text-[13px] font-semibold text-lime hover:bg-glass-hi">
+          <Sparkles size={14} strokeWidth={1.75} /> Suggest the best rotations
         </button>
-      )}
+      </div>
     </section>
   );
 }

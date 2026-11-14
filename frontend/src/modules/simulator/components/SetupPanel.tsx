@@ -1,16 +1,21 @@
-import { Loader2, Play } from "lucide-react";
+import { Droplets, Loader2, Play } from "lucide-react";
 import { useEffect } from "react";
 import { Button } from "../../../shared/components";
-import type { useSimulator } from "../state/useSimulator";
+import { useUnits } from "../../../shared/units";
+import type { Sim } from "../state/useSimulator";
 import type { SimulatorOptions } from "../types";
 import { PriorityControls } from "./PriorityControls";
 import { RotationBuilder } from "./RotationBuilder";
 import { ScenarioControls } from "./ScenarioControls";
 
-type Sim = ReturnType<typeof useSimulator>;
-
 /** Left panel: field, rotations, scenario, priorities, and the one primary action. */
-export function SetupPanel({ options, sim }: { options: SimulatorOptions; sim: Sim }) {
+export function SetupPanel({ options, sim, onSuggest, onIrrigation }: {
+  options: SimulatorOptions;
+  sim: Sim;
+  onSuggest: () => void;
+  onIrrigation: () => void;
+}) {
+  const u = useUnits();
   const { draft, actions, state } = sim;
 
   useEffect(() => {
@@ -28,7 +33,7 @@ export function SetupPanel({ options, sim }: { options: SimulatorOptions; sim: S
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="scroll-thin min-h-0 flex-1 space-y-5 overflow-y-auto px-[18px] pb-4 pt-[18px]">
-        <section aria-labelledby="field-h">
+        <section aria-labelledby="field-h" data-tour="field">
           <div className="mb-2 flex items-baseline justify-between">
             <h2 id="field-h" className="text-[15px] font-bold">Field</h2>
             <span className="text-[13px] text-mut">{options.fields.length} fields</span>
@@ -43,7 +48,7 @@ export function SetupPanel({ options, sim }: { options: SimulatorOptions; sim: S
                   <span>
                     <span className="block text-[15px] font-bold">{f.name}</span>
                     <span className="block text-[13px] text-mut">
-                      {f.crop_id ? `Now ${cropName(f.crop_id)!.toLowerCase()}` : "No current crop"} · {f.area_ha} ha
+                      {f.crop_id ? `Now ${cropName(f.crop_id)!.toLowerCase()}` : "No current crop"} · {u.area(f.area_ha)}
                     </span>
                   </span>
                   {on && <span className="text-[12px] font-semibold text-mut">{f.soil.replace(" (SoilGrids)", "")}</span>}
@@ -63,23 +68,29 @@ export function SetupPanel({ options, sim }: { options: SimulatorOptions; sim: S
 
         <div className="border-t border-line" />
         <RotationBuilder rotations={draft.rotations} crops={options.crops} onCrops={actions.setCrops}
-          onAdd={actions.addRotation} onRemove={actions.removeRotation} />
+          onCoverCrop={actions.setCoverCrop} onAdd={() => actions.addRotation()} onRemove={actions.removeRotation}
+          onSuggest={onSuggest} />
         <div className="border-t border-line" />
-        <ScenarioControls scenario={draft.scenario} presets={options.scenario_presets}
+        <ScenarioControls scenario={draft.scenario} presets={options.scenario_presets} projections={options.projections}
           economics={draft.includeEconomics} onChange={actions.setScenario} />
         <div className="border-t border-line" />
         <PriorityControls priorities={draft.priorities} economics={draft.includeEconomics}
           onChange={actions.setPriority} onEconomics={actions.setEconomics} />
       </div>
 
-      <div className="border-t border-line p-[14px]">
+      <div className="space-y-2 border-t border-line p-[14px]">
         {state.runError && (
-          <p role="alert" className="mb-2 text-[13px] leading-snug text-alert">{state.runError}</p>
+          <p role="alert" className="text-[13px] leading-snug text-alert">{state.runError}</p>
         )}
-        <Button variant="primary" className="w-full !py-3" onClick={() => void actions.run()} disabled={state.running}>
-          {state.running ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} strokeWidth={2} />}
-          {state.running ? "Running 25 weather years…" : "Run simulation"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="primary" className="flex-1 !py-3" onClick={() => void actions.run()} disabled={state.running} data-tour="run">
+            {state.running ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} strokeWidth={2} />}
+            {state.running ? "Running 25 weather years…" : "Run simulation"}
+          </Button>
+          <Button onClick={onIrrigation} title="Irrigation planner" aria-label="Irrigation planner" className="!px-3">
+            <Droplets size={17} strokeWidth={1.75} className="text-water" />
+          </Button>
+        </div>
       </div>
     </div>
   );

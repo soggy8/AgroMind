@@ -169,3 +169,12 @@ def test_cooler_scenario_gets_no_warming_penalty(api):
     body = client.post(f"{BASE}/run", json=_request(client, temp_delta_c=-1)).json()
     for r in body["rotations"]:
         assert r["vs_baseline"]["relative_yield_change_pct"] == r["vs_baseline"]["other_heat_response_change_pct"]
+
+
+def test_advisor_facts_describe_a_projection(api):
+    client = api
+    req = _request(client, projection="ssp245_2050s")
+    result = client.post(f"{BASE}/run", json=req).json()
+    facts = client.post(f"{BASE}/advisor-context", json=result).json()["facts"]
+    scenario = next(f for f in facts if f.startswith("SCENARIO:"))
+    assert "NEX-GDDP-CMIP6" in scenario and "Response to heat" in scenario

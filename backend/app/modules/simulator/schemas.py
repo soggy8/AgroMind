@@ -31,6 +31,10 @@ class Scenario(BaseModel):
     irrigation_cap_mm: float | None = Field(None, ge=0, le=1000, description="Per season; only for 'limited'.")
     years: int = Field(5, ge=1, le=10)
     price_change_pct: float = Field(0.0, ge=-40.0, le=40.0, description="Applied to all crop prices; economics only.")
+    projection: str | None = Field(
+        None, pattern=r"^ssp\d{3}_\d{4}s$",
+        description="NASA NEX-GDDP-CMIP6 projection id, e.g. 'ssp245_2050s'. When set, it replaces the "
+                    "temperature and rainfall sliders with the model ensemble's monthly changes.")
     heat_response: HeatResponse = Field(
         "published", description="How yields respond to warming: the published US average (Zhao et al. 2017) "
                                  "or this county's own 2001-2025 history, which shows a much smaller response.")
@@ -46,6 +50,7 @@ class RotationInput(BaseModel):
     id: str = Field(..., description="Client-chosen, stable within a run (e.g. 'A').")
     name: str
     crops: list[str] = Field(..., min_length=1, max_length=6, description="Crop ids from the catalogue, repeated to fill `years`.")
+    cover_crop: bool = Field(False, description="Cereal rye over winter before each spring-planted crop.")
 
 
 class Priorities(BaseModel):
@@ -59,12 +64,16 @@ class Priorities(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+Units = Literal["metric", "us"]
+
+
 class SimulationRequest(BaseModel):
     field_id: str
     rotations: list[RotationInput] = Field(..., min_length=1, max_length=MAX_ROTATIONS)
     scenario: Scenario = Scenario()
     priorities: Priorities | None = Field(None, description="Omit to use the farm's priorities from CropTwin.")
     include_economics: bool = False
+    units: Units = Field("metric", description="Units for generated sentences only; numbers are always metric.")
 
 
 # ---------- outputs ----------
@@ -146,6 +155,8 @@ class RotationResult(BaseModel):
     rain_sufficiency: Stat       # share of crop water need met by rain alone, 0-1
     stress_season_frequency: float  # share of ensemble seasons with relative yield < 0.7
     by_start_year: list[float]   # mean relative yield per ensemble track, aligned with ensemble_start_years
+    track_seasons: list[list[float]] = []  # [track][season] relative yield: replay any starting year
+    cover_crop: bool = False
     vs_baseline: VsBaseline
     soil: SoilIndex
     economics: Economics | None
@@ -153,6 +164,28 @@ class RotationResult(BaseModel):
     indicator_scores: dict[IndicatorId, float]  # each 0-1, higher is better
     score: float                 # weighted by priorities, 0-1
     rank: int
+
+
+class YearClimate(BaseModel):
+    """One historical year's growing season (May-Sep), observed and with the scenario applied."""
+    year: int
+    rain_mm: float
+    scenario_rain_mm: float
+    tmax_c: float
+    scenario_tmax_c: float
+    hot_days: int
+    scenario_hot_days: int
+
+
+class ProjectionInfo(BaseModel):
+    id: str
+    ssp: str
+    ssp_name: str
+    period: str
+    years: str
+    models: int
+    temp_change_c: dict[str, float]   # median, min, max across models, May-Sep mean temperature
+    rain_change_pct: dict[str, float]  # median, min, max across models, May-Sep rainfall
 
 
 class Recommendation(BaseModel):
@@ -184,6 +217,8 @@ class SimulationResult(BaseModel):
     assumptions: list[Assumption]
     ensemble_size: int
     ensemble_start_years: list[int]
+    yearly_climate: list[YearClimate] = []
+    projection: ProjectionInfo | None = None
     economics_included: bool
     data_note: str               # e.g. "Sample data (offline)" when the cached series was used
     model_version: str
@@ -232,6 +267,8 @@ class SimulatorOptions(BaseModel):
     scenario_presets: list[ScenarioPreset]
     default_priorities: Priorities
     default_irrigation: IrrigationMode
+    projections: list[ProjectionInfo] = []
+    projection_source: str | None = None
 
 
 # ---------- saved runs ----------
@@ -262,3 +299,54 @@ class AdvisorContext(BaseModel):
     instructions: str
     facts: list[str]
     suggested_questions: list[str]
+
+
+# ---------- rotation finder ----------
+
+class FinderRequest(BaseModel):
+    field_id: str
+    scenario: Scenario = Scenario()
+    priorities: Priorities | None = None
+    include_economics: bool = False
+    crops: list[str] | None = Field(None, description="Crops to combine; default all in the catalogue.")
+    max_length: int = Field(3, ge=1, le=3)
+    cover_crop: bool = False
+    top: int = Field(5, ge=1, le=10)
+    units: Units = "metric"
+
+
+class FinderResult(BaseModel):
+    kind: Literal["modelled"] = "modelled"
+    candidates_tested: int
+    rotations: list[RotationResult]   # best first
+    recommendation: Recommendation
+    data_note: str
+
+
+# ---------- irrigation planner ----------
+
+class IrrigationPlanRequest(BaseModel):
+    field_id: str
+    rotation: RotationInput
+    scenario: Scenario = Scenario()
+    target_share: float = Field(0.9, ge=0.5, le=1.2, description="Yield to keep, as a share of typical (p50).")
+    units: Units = "metric"
+
+
+class IrrigationPoint(BaseModel):
+    cap_mm: float | None              # per season; None = no limit
+    relative_yield: Stat
+    irrigation_mm_per_year: float     # p50
+    water_cost_per_ha_year: float
+    stress_season_frequency: float
+
+
+class IrrigationPlan(BaseModel):
+    kind: Literal["modelled"] = "modelled"
+    rotation_name: str
+    target_share: float
+    points: list[IrrigationPoint]     # from no irrigation to unlimited
+    recommended_cap_mm: float | None  # smallest cap reaching the target; None if none does
+    reaches_target: bool
+    summary: str
+    cost_source: str
