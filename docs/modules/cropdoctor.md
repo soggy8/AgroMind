@@ -85,6 +85,12 @@ the **centre pixel** of each demo field; the build uses a field mean, so these w
 - **2012 drought.** Creek (corn) was 11% below normal in the period 19 Jul to 3 Aug (0.80 against
   0.90, lower than all 10 previous years), then 9% and 12% below. West (pasture) was 9% to 12%
   below for five periods. North (soybeans) stayed at or above normal all summer.
+  *Note, 2026-11-14:* on field means (5 points) the rule gives West Field a Watch from 11 Jul 2012
+  (three low periods, -6% to -8%). Creek has one low period (19 Jul, -9.9%); its 27 Jul period
+  (-6.6%) is not low because 2002 and 2004 were lower. Kiril chose to keep the rule and thresholds
+  and show the West finding; no threshold was changed. On field means USDA's crop map puts West as
+  corn or soybeans in several years (2012: 3 of 5 points corn, centre pixel pasture), so the screen
+  labels it "Mixed" where the points disagree.
 - **Weather then.** 30 days to 12 Aug 2012: 54 mm of rain against 119 mm (54% short, one of the
   previous 10 years drier), highs averaging 35.1 °C (5.2 °C above normal).
 - **Other years.** Aug 2020: Creek 40% below, North 22% below. Jun 2013: all three fields 35% to
@@ -132,8 +138,8 @@ the **centre pixel** of each demo field; the build uses a field mean, so these w
   window. **(Kiril)** At least 7 of those years must have data, otherwise the value is shown
   without a comparison. **(call)**
 - **Default date: 12 August 2012. (call, Kiril said "just pick one year")** It is the first date
-  on which two low periods had both ended, so the first date the rule can honestly fire. The
-  builder confirms it against the field means and reports back if it does not hold.
+  on which two low periods had both ended, so the first date the rule can honestly fire. It was
+  confirmed on field means; the finding on that date is on West Field.
 - "Today" uses the samples plus a refresh from POWER and Planetary Computer, cached under
   `data/cache/`. If the refresh fails the screen says which date the saved data runs to.
 
