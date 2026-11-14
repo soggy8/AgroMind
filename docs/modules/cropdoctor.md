@@ -1,6 +1,9 @@
 # CropDoctor: design
 
-Status: **design, waiting for Kiril's approval. Nothing is built yet.** Written 2026-11-14.
+Status: **built, 2026-11-14.** The Command Center runs on real data for the demo farm, with the
+West Field finding. **Not built:** the Landsat picture inside each field, SMAP soil moisture, and
+greenness for farms other than the demo farm. The advisor is only a "Work in progress" button
+(see "Still to do").
 Scope notes for the module are in `backend/app/modules/cropdoctor/README.md`.
 
 Decisions marked **(Kiril)** were made by Kiril. Decisions marked **(call)** were made while
@@ -91,6 +94,29 @@ the **centre pixel** of each demo field; the build uses a field mean, so these w
   and show the West finding; no threshold was changed. On field means USDA's crop map puts West as
   corn or soybeans in several years (2012: 3 of 5 points corn, centre pixel pasture), so the screen
   labels it "Mixed" where the points disagree.
+- **Result on the demo date, 12 Aug 2012 (field means, from the API).** Period 27 Jul to 11 Aug.
+
+  | Field | Crop label | Greenness | Normal (10 years) | Difference | Status |
+  |---|---|---|---|---|---|
+  | North | Mixed: Soybeans and Corn | 0.8767 | 0.87 | +0.8% | normal |
+  | Creek | Corn | 0.8136 | 0.8715 | -6.6% | normal |
+  | West | Mixed: Corn and Grassland/Pasture | 0.7562 | 0.8249 | -8.3% | watch since 11 Jul 2012 |
+
+  Weather, 14 Jul to 12 Aug (one value for the farm):
+
+  | Value | Kind | Result | Normal | Difference |
+  |---|---|---|---|---|
+  | Rainfall, 30 days | Observed | 54.32 mm | 119.25 mm | -54.4% |
+  | Daily high, 30-day mean | Observed | 35.05 °C | 29.88 °C | +5.2 °C |
+  | Water demand (ET0) | Modelled | 6.41 mm/day | 4.96 mm/day | +29.4% |
+
+  The one finding is West Field, Watch, "Possible water stress": "Water stress may be one
+  explanation", with the check "Dig to 15 cm in a few places across the field and feel whether the
+  soil is dry." Creek is not flagged: its 27 Jul period is not low because two earlier years
+  were lower. Kiril kept the rule and thresholds; nothing was tuned.
+- **Crop labels.** Where the USDA crop-map points disagree the label reads "Mixed: A and B". Creek
+  is unanimous every year. North splits 3 to 2 between corn and soybeans every year. West mixes
+  pasture with corn and soybeans.
 - **Weather then.** 30 days to 12 Aug 2012: 54 mm of rain against 119 mm (54% short, one of the
   previous 10 years drier), highs averaging 35.1 °C (5.2 °C above normal).
 - **Other years.** Aug 2020: Creek 40% below, North 22% below. Jun 2013: all three fields 35% to
@@ -138,11 +164,14 @@ the **centre pixel** of each demo field; the build uses a field mean, so these w
   window. **(Kiril)** At least 7 of those years must have data, otherwise the value is shown
   without a comparison. **(call)**
 - **Default date: 12 August 2012. (call, Kiril said "just pick one year")**
-  The date was picked from the centre-pixel reading of Creek. On field means the finding is on West Field, whose Watch can
-  first be seen on 4 Aug 2012. 12 August is kept as the demo date because by then the 30-day
-  weather shows the drought.
+  The date was picked from the centre-pixel reading of Creek. On field means the finding is on
+  West Field, not Creek, and its Watch is since 11 Jul 2012 (two low periods had both ended by
+  4 Aug). 12 August is kept as the demo date because by then the 30-day weather shows the drought.
 - "Today" uses the samples plus a refresh from POWER and Planetary Computer, cached under
-  `data/cache/`. If the refresh fails the screen says which date the saved data runs to.
+  `data/cache/`. The refresh runs only for the demo farm, only when the date asked for is more than
+  16 days past the saved data, and at most once an hour. If it fails the screen says "Couldn't
+  reach NASA data. Showing saved data to …" with the date the saved data runs to. The API returns
+  that date as `data_through`; it is null for farms other than the demo farm.
 
 ### Finding rule **(Kiril)**
 
@@ -231,8 +260,9 @@ plain data out, no FastAPI, pydantic, database or network. **(call)**
   with its date. **(call)**
 - In a replay the crop label is USDA's for that year ("Corn (2012)"), tagged Modelled; today it is
   the farm profile's. **(call)**
-- "Ask the advisor" opens a drawer like the Simulator's: it says the advisor is not connected yet
-  and lists the facts it will be allowed to use. Built last. **(Kiril)**
+- "Ask the advisor" opens a dialog like the Simulator's drawer. **Built reduced (Kiril):** the
+  button and a dialog that says "Work in progress" and "The AI advisor isn't built yet." The fact
+  list and the endpoint are not built; the API table row above is the planned design.
 - Every state in `DESIGN.md` section 9 is handled.
 - Shared pieces `DESIGN.md` names that do not exist yet get built to its spec: `IndicatorRow`,
   `FieldRow`, `Badge`, `SeasonChart`, `WeeklyStrip`, `NdviKey`.
@@ -285,13 +315,55 @@ To pass on:
 
 - **CropTwin seed (Andrej):** USDA has West Field as pasture, not oats, and North and Creek
   rotating corn and soybeans. Crop history for 2008 to 2021 could be seeded from the same source.
+- **CropTwin field outlines (Andrej):** the outlines for North and West seem to cover more than one
+  real field. The USDA points inside North split 3 to 2 between corn and soybeans every year (the
+  west strip has the opposite rotation), and West mixes pasture with corn and soybeans. Creek is
+  unanimous every year. CropDoctor shows "Mixed: A and B" for these fields. Redrawing the outlines
+  to match real fields would give clean crop labels and sharper greenness.
+- **CropTwin seed (Andrej):** the seed has no `soil_texture`, so CropDoctor shows pH and clay only.
+  The Simulator derives the texture from sand and clay.
 - **Simulator (Andrej):** reference ET0 now exists in both modules, because they may not import
   each other. Moving it to `shared/` would remove the copy. The same goes for `useMedia`.
 - **Connectors owner:** CropDoctor's `ports.py` will hold working fetchers for Planetary Computer
   and POWER that can move into `shared/connectors`. `docs/data-sources.md` says MODIS and Landsat
   need an Earthdata login; through Planetary Computer they do not.
 
-## 11. Open assumption
+## 11. Run it
+
+From the repo root, with the backend and frontend set up as in `README.md`:
+
+```bash
+cd backend
+.venv/bin/alembic upgrade head
+.venv/bin/python -m app.modules.croptwin.seed            # demo farm
+.venv/bin/python -m app.modules.cropdoctor.fetch_samples # only to rebuild or extend the samples
+.venv/bin/uvicorn app.main:app --port 8000
+cd ../frontend && npm run dev                            # http://localhost:5173, proxies /api
+cd frontend && npx playwright test                       # needs the API and the dev server running
+cd backend && .venv/bin/python -m pytest -q
+```
+
+Open the Command Center. It starts on the 2012 replay. `GET /api/farms/demo/health?as_of=2012-08-12`
+gives the same data as JSON.
+
+`fetch_samples` needs the network and writes `data/samples/modis_ndvi_demo_fields.csv`,
+`usda_cdl_demo_fields.csv` and `power_daily_story_county_ia_2026.csv`. Tests never use the network,
+but a few use today's real date. Once the committed samples are more than 16 days old those tests
+would trigger a refresh. Rerun `fetch_samples` or patch the fetchers in them.
+
+## 12. Still to do
+
+- The full advisor: `advisor.py` fact list, the `advisor-context` endpoint, and the drawer content.
+- Soil texture: empty in CropDoctor because the CropTwin seed has no `soil_texture`. Derive it from
+  sand and clay as the Simulator does, or have CropTwin seed it.
+- The Landsat 30 m picture inside each field (needs its own short plan).
+- SMAP soil moisture (needs an Earthdata login).
+- Connectors moving from CropDoctor's `ports.py` to `shared/connectors`.
+- Greenness for farms other than the demo farm.
+- `useMedia` and ET0 copies moving to `shared/`.
+- On a phone the map shows no greenness values; they are in the Fields tab.
+
+## 13. Open assumption
 
 Judges see a video or slides and the repo, so the demo runs on a laptop and needs no public link.
 If a live link is required, hosting becomes a team task and the "today" refresh has to work on a

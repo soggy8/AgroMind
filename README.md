@@ -97,4 +97,5 @@ The database port is published on `127.0.0.1` only; `POSTGRES_PASSWORD` in `.env
 - Platform: settings, database layer, migrations, health check. See `docs/architecture.md`.
 - CropTwin: farm, field, soil and crop-history tables with a CRUD API at `/api/farms`.
 - Simulator: working end to end; still reads the demo farm from `ports.py`, not CropTwin.
-- CropDoctor, connectors, advisor: not started.
+- CropDoctor: Command Center on real NASA data for the demo farm (greenness against normal, weather, cautious findings). See `docs/modules/cropdoctor.md`. Its advisor is a "Work in progress" button only.
+- Connectors, advisor: not started.
