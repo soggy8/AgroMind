@@ -4,14 +4,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.shared.db import get_session
 
-from . import service
+from . import colour_classes, places, service
 from .schemas import (CropHistoryIn, FarmCreate, FarmOut, FarmSummary, FarmUpdate, FieldCreate, FieldOut,
-                      FieldUpdate, SoilLayerIn)
+                      FieldUpdate, PlaceSearch, SoilLayerIn, ColourReading, WeatherOut)
 
 router = APIRouter(prefix="/api/farms", tags=["croptwin"])
 T = TypeVar("T")
@@ -27,6 +27,8 @@ def _call(fn: Callable[..., T], *args) -> T:
         raise HTTPException(409, str(e)) from e
     except service.InvalidBoundary as e:
         raise HTTPException(422, str(e)) from e
+    except service.SoilDataUnavailable as e:
+        raise HTTPException(503, str(e)) from e
 
 
 def _no_content(fn: Callable[..., None], *args) -> Response:
@@ -37,6 +39,32 @@ def _no_content(fn: Callable[..., None], *args) -> Response:
 @router.get("", response_model=list[FarmSummary])
 def list_farms(session: Session = DB):
     return service.list_farms(session)
+
+
+# Declared before /{farm_id} so "places" isn't read as a farm id.
+@router.get("/places", response_model=PlaceSearch)
+def search_places(q: str = Query(min_length=2, max_length=200),
+                  lang: str | None = Query(None, max_length=35, pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$")):
+    """Place names via OpenStreetMap Nominatim, within its usage policy (see places.py)."""
+    try:
+        return PlaceSearch(results=places.search(q, lang), attribution=places.ATTRIBUTION)
+    except places.PlaceSearchBusy as e:
+        raise HTTPException(429, str(e)) from e
+    except places.PlaceSearchUnavailable as e:
+        raise HTTPException(503, f"{e} Try again in a moment, or type coordinates such as 42.03, -93.46.") from e
+
+
+@router.get("/nasa-colour", response_model=ColourReading)
+def nasa_colour(colormap: str = Query(pattern=r"^[A-Za-z0-9_]{3,100}$"), r: int = Query(ge=0, le=255),
+                g: int = Query(ge=0, le=255), b: int = Query(ge=0, le=255), a: int = Query(255, ge=0, le=255)):
+    """NASA's value class for a GIBS map pixel's colour (see colour_classes.py)."""
+    try:
+        entries = colour_classes.colour_map(colormap)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+    except colour_classes.ColourMapUnavailable as e:
+        raise HTTPException(503, f"{e} Try again in a moment.") from e
+    return ColourReading(**colour_classes.classify(entries, (r, g, b), a).__dict__)
 
 
 @router.post("", response_model=FarmOut, status_code=201)
@@ -82,6 +110,21 @@ def delete_field(farm_id: str, field_id: str, session: Session = DB):
 @router.put("/{farm_id}/fields/{field_id}/soil", response_model=FieldOut)
 def replace_soil(farm_id: str, field_id: str, body: list[SoilLayerIn], session: Session = DB):
     return _call(service.replace_soil_layers, session, farm_id, field_id, body)
+
+
+@router.post("/{farm_id}/fields/{field_id}/soil/prefill", response_model=FieldOut)
+def prefill_soil(farm_id: str, field_id: str, session: Session = DB):
+    """Replace the field's soil layers with SoilGrids mapped estimates at its centroid."""
+    return _call(service.prefill_soil_from_soilgrids, session, farm_id, field_id)
+
+
+@router.get("/{farm_id}/fields/{field_id}/weather", response_model=WeatherOut)
+def field_weather(farm_id: str, field_id: str, session: Session = DB):
+    """Last 30 days of NASA POWER daily weather at the field's centroid."""
+    try:
+        return _call(service.field_weather, session, farm_id, field_id)
+    except service.WeatherUnavailable as e:
+        raise HTTPException(503, f"{e} Try again later.") from e
 
 
 @router.post("/{farm_id}/fields/{field_id}/crop-history", response_model=FieldOut, status_code=201)

@@ -1,3 +1,6 @@
+"""CropTwin basics: geometry, the farm and field lifecycle, validation, soil and crop-history sources, the demo seed
+and the health check. Other files cover soil prefill, overlaps, farms, place search, NASA values, deletes and route
+coverage."""
 import pytest
 
 from app.modules.croptwin import geometry, service
@@ -37,6 +40,9 @@ def test_farm_and_field_lifecycle(client):
 
     r = client.patch(f"/api/farms/{farm['id']}/fields/{field['id']}", json={"area_ha": 21})
     assert (r.json()["area_ha"], r.json()["area_source"]) == (21, "farmer")
+    r = client.patch(f"/api/farms/{farm['id']}/fields/{field['id']}", json={"area_ha": None})
+    assert r.json()["area_source"] == "computed_from_boundary"
+    assert r.json()["area_ha"] == pytest.approx(19.85, rel=0.01)
 
     assert client.get("/api/farms").json() == [{"id": farm["id"], "name": "Test Farm", "region": None,
                                                 "field_count": 1}]

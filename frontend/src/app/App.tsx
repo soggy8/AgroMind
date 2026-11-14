@@ -1,4 +1,5 @@
 import { CommandCenterPage } from "../modules/cropdoctor/pages/CommandCenterPage";
+import { FarmProfilePage } from "../modules/croptwin/pages/FarmProfilePage";
 import { SimulatorPage } from "../modules/simulator/pages/SimulatorPage";
 import { UnitsProvider } from "../shared/units";
 import { PlaceholderPage } from "./PlaceholderPage";
@@ -11,6 +12,7 @@ export function App() {
     <UnitsProvider>
       {route === "command-center" ? <CommandCenterPage route={route} onNavigate={navigate} />
         : route === "simulator" ? <SimulatorPage route={route} onNavigate={navigate} />
+        : route === "farm-profile" ? <FarmProfilePage route={route} onNavigate={navigate} />
         : <PlaceholderPage route={route} onNavigate={navigate} />}
     </UnitsProvider>
   );
