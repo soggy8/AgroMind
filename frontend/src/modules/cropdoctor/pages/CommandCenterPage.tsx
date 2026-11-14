@@ -15,7 +15,14 @@ import { fmtDate, fmtValue } from "../lib/format";
 import { useHealth } from "../state/useHealth";
 import type { FarmHealth } from "../types";
 
-const FARM_ID = "demo";
+/**
+ * The farm to show: `?farm=<id>` in the page address (before the #), otherwise the demo farm.
+ * The top bar's farm switcher is still a shared placeholder; when it exists, it should set this.
+ */
+function farmFromAddress(): string {
+  return new URLSearchParams(window.location.search).get("farm") || "demo";
+}
+
 const DESKTOP = "(min-width: 1024px)";
 const DESKTOP_INSETS: MapInsets = { left: 370, right: 430, top: 94, bottom: 20 };
 const STACKED_INSETS: MapInsets = { left: 0, right: 0, top: 0, bottom: 0 };
@@ -35,7 +42,8 @@ function sourceText(health: FarmHealth | null, fieldId: string | null, loading: 
 
 /** Command Center: each field's greenness against its own normal, and one cautious finding. */
 export function CommandCenterPage({ route, onNavigate }: { route: Route; onNavigate: (r: Route) => void }) {
-  const { health, loading, error, setAsOf, fieldId, selectField, retry } = useHealth(FARM_ID);
+  const [farmId] = useState(farmFromAddress);
+  const { health, loading, error, setAsOf, fieldId, selectField, retry } = useHealth(farmId);
   const desktop = useMedia(DESKTOP);
   const [layer, setLayer] = useState<Layer>("greenness");
   const [picked, setTab] = useState<Tab | null>(null);
