@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { KindTag, SegmentedTabs } from "../../../shared/components";
 import { signed } from "../lib/format";
-import type { IrrigationMode, Scenario, ScenarioPreset } from "../types";
+import type { HeatResponse, IrrigationMode, Scenario, ScenarioPreset } from "../types";
 
 function Slider({ id, label, value, display, min, max, step, color, onChange, hint }: {
   id: string; label: string; value: number; display: string; min: number; max: number; step: number;
@@ -60,6 +60,20 @@ export function ScenarioControls({ scenario, presets, economics, onChange }: {
       <p className="text-[12px] leading-snug text-mut">
         Shifts every day of 2001–2025 weather. A what-if, not a forecast.
       </p>
+
+      <div className="mt-3">
+        <div className="mb-1.5 flex items-baseline justify-between">
+          <span className="text-sm font-semibold">Crops' response to heat</span>
+        </div>
+        <SegmentedTabs<HeatResponse> label="Crops' response to heat" size="sm" value={scenario.heat_response}
+          items={[{ id: "published", label: "US research" }, { id: "local", label: "This county" }]}
+          onChange={(heat_response) => onChange({ heat_response })} />
+        <p className="mt-1.5 text-[12px] leading-snug text-mut">
+          {scenario.heat_response === "published"
+            ? "Published US average: maize loses about 10% per °C of warming (Zhao et al. 2017)."
+            : "This county's 2001–2025 yields: far more heat-tolerant than the US average. Optimistic."}
+        </p>
+      </div>
 
       <div className="mt-3">
         <div className="mb-1.5 text-sm font-semibold">Irrigation</div>

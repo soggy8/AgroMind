@@ -56,8 +56,7 @@ def _recommend(ordered: list[RotationResult], w: dict[IndicatorId, float]) -> Re
     else:
         headline = f"{best.name} fits your priorities best in this scenario"
 
-    contributions = sorted(((w[k] * v, k) for k, v in best.indicator_scores.items() if w[k] > 0), reverse=True)
-    reasons = [_describe(best, k) for _, k in contributions[:2]]
+    reasons = _reasons(best, ordered, w)
     if best.vs_baseline.relative_yield_change_pct <= -1:
         reasons.append(f"Its yield falls {abs(best.vs_baseline.relative_yield_change_pct):.0f}% against today's climate, "
                        f"{_compare_drop(best, ordered)}")
@@ -72,6 +71,27 @@ def _recommend(ordered: list[RotationResult], w: dict[IndicatorId, float]) -> Re
                               f"{_value(rival, k)} against {_value(best, k)} {TRADE_OFF_UNIT[k]}")
     return Recommendation(rotation_id=best.rotation_id, headline=headline, reasons=reasons,
                           trade_offs=trade_offs, near_tie=near_tie)
+
+
+def _reasons(best: RotationResult, ordered: list[RotationResult], w: dict[IndicatorId, float]) -> list[str]:
+    """Up to two reasons: where the winner actually beats the alternatives, weighted by priority.
+
+    With one rotation, or when it wins on no single indicator, describe its strongest points instead.
+    """
+    rivals = ordered[1:]
+    edges = []
+    for k, v in best.indicator_scores.items():
+        if w[k] == 0 or not rivals:
+            continue
+        runner_up = max(rivals, key=lambda r: r.indicator_scores.get(k, 0))
+        edge = v - runner_up.indicator_scores.get(k, 0)
+        if edge > 0.005:
+            edges.append((w[k] * edge, k, runner_up))
+    edges.sort(key=lambda e: e[0], reverse=True)
+    if edges:
+        return [f"{_describe(best, k)}, against {_value(r, k)} for {r.name}" for _, k, r in edges[:2]]
+    contributions = sorted(((w[k] * v, k) for k, v in best.indicator_scores.items() if w[k] > 0), reverse=True)
+    return [_describe(best, k) for _, k in contributions[:2]]
 
 
 def _compare_drop(best: RotationResult, ordered: list[RotationResult]) -> str:
@@ -107,18 +127,18 @@ TRADE_OFF_UNIT = {"yield": "of typical yield", "water": "of water need met witho
 
 def _describe(r: RotationResult, k: str) -> str:
     if k == "yield":
-        y = r.relative_yield
-        return f"Yield averages {y.p50 * 100:.0f}% of typical (most years {y.p10 * 100:.0f}-{y.p90 * 100:.0f}%)"
+        return f"Highest yield, {r.relative_yield.p50 * 100:.0f}% of typical"
     if k == "water":
-        return (f"Rain and stored soil water cover {r.rain_sufficiency.p50 * 100:.0f}% of crop water need"
-                + (f", with {r.irrigation_mm_per_year.p50:.0f} mm/year irrigation" if r.irrigation_mm_per_year.p50 >= 1 else ""))
+        irrigation = f" (plus {r.irrigation_mm_per_year.p50:.0f} mm/year irrigation)" if r.irrigation_mm_per_year.p50 >= 1 else ""
+        return f"Rain and stored soil water cover more of its water need, {r.rain_sufficiency.p50 * 100:.0f}%{irrigation}"
     if k == "risk":
-        return f"Poor seasons (below 70% of typical yield) in {r.stress_season_frequency * 100:.0f}% of simulated seasons"
+        return f"Fewest poor seasons (below 70% of typical yield), {r.stress_season_frequency * 100:.0f}%"
     if k == "soil":
-        return f"Soil index {r.soil.score}/100: {r.soil.notes[0].split(':')[0].lower()}" + \
-            (", including a legume" if r.soil.components.get("legume") else "")
+        return (f"Best soil index, {r.soil.score}/100: {r.soil.notes[0].split(':')[0].lower()}"
+                + (", including a legume" if r.soil.components.get("legume") else ""))
     if k == "margin" and r.economics:
-        return f"Margin of about ${r.economics.margin_per_ha.p50:,.0f}/ha per year after all costs, including land rent"
+        m = r.economics.margin_per_ha.p50
+        return f"Best margin after all costs including land rent, {'-' if m < 0 else ''}${abs(m):,.0f}/ha per year"
     return ""
 
 

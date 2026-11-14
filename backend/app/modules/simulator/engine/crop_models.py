@@ -49,5 +49,14 @@ def heat_factor(heat_degree_days, loss_per_degday: float = HEAT_LOSS_PER_DEGDAY,
     return 1 - np.minimum(cap, loss_per_degday * np.asarray(heat_degree_days, float))
 
 
+def warming_factor(k_per_dd: float, extra_degree_days) -> np.ndarray:
+    """Published warming response: yield share left after the scenario's extra degree-days.
+
+    Applied on top of the locally calibrated model, only to the heat a scenario adds compared with
+    the same year today, so historical variability stays as calibrated.
+    """
+    return np.exp(-k_per_dd * np.maximum(np.asarray(extra_degree_days, float), 0.0))
+
+
 def rotation_factor(crop: CropParams, predecessor_crop_id: str | None) -> float:
     return crop.monoculture_factor if predecessor_crop_id == crop.id else 1.0

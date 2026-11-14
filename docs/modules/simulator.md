@@ -130,7 +130,13 @@ growth, nitrogen, pests, excess water.
 
 **Yield.** `relative = water factor x heat factor x rotation factor / typical factor`.
 - Water: `1 - Ky (1 - ETa/ETc)` over the season (FAO-56 Eq. 90, Ky from Table 24).
-- Heat: mid-season degree-days above the crop's threshold x 0.2% (calibrated), capped at 40%.
+- Heat in today's weather: mid-season degree-days above the crop's threshold x 0.2% (calibrated),
+  capped at 40%.
+- Response to warming (scenario `heat_response`, default `published`): the scenario's extra
+  degree-days above 29 °C (maize) or 30 °C (others), over the whole season and compared with the same
+  year today, cost yield at a per-crop rate solved so +1 °C reproduces Zhao et al. (2017) US
+  estimates (maize −10.3%, soybean −6.8%, wheat −5.5% per °C). `local` uses only the county's history,
+  which implies about −2% per °C. Results always report the other setting's number too.
 - Rotation: maize after maize x 0.915 (ISU 2026 budget yields 193 vs 211 bu/ac); other crops
   after themselves have assumed penalties.
 - Typical factor: the crop's mean water x heat factor under today's climate, one rain-fed season
@@ -172,8 +178,9 @@ Honest limits:
   correlate weakly with this county's yields, so this is partly the county, but the model should
   not be used to explain a single year.
 - The soybean check matches the spread but not the timing (r ≈ −0.4 over 9 years).
-- Climate sensitivity is loosely constrained: +2 °C and −20% rain gives about −6% maize yield,
-  which is on the gentle side of published US estimates. Treat scenario effects as conservative.
+- The county's history implies a much smaller response to warming (about −2% per °C for maize) than
+  published US averages (−10.3%). Both are offered; the published one is the default and the UI
+  always shows the other number.
 
 ---
 

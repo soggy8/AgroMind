@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, model_validator
 
 Kind = Literal["observed", "modelled", "scenario"]
 IrrigationMode = Literal["none", "limited", "full"]
+HeatResponse = Literal["published", "local"]
 IndicatorId = Literal["yield", "water", "risk", "soil", "margin"]
 
 MAX_ROTATIONS = 4  # DESIGN.md section 7: one colour each from [lime, rain, water, soil]
@@ -30,6 +31,9 @@ class Scenario(BaseModel):
     irrigation_cap_mm: float | None = Field(None, ge=0, le=1000, description="Per season; only for 'limited'.")
     years: int = Field(5, ge=1, le=10)
     price_change_pct: float = Field(0.0, ge=-40.0, le=40.0, description="Applied to all crop prices; economics only.")
+    heat_response: HeatResponse = Field(
+        "published", description="How yields respond to warming: the published US average (Zhao et al. 2017) "
+                                 "or this county's own 2001-2025 history, which shows a much smaller response.")
 
     @model_validator(mode="after")
     def _cap_only_when_limited(self) -> "Scenario":
@@ -127,6 +131,7 @@ class VsBaseline(BaseModel):
     relative_yield_change_pct: float      # change in p50 relative yield, in percent
     irrigation_change_mm_per_year: float
     stress_frequency_change: float        # in share of seasons, e.g. +0.20
+    other_heat_response_change_pct: float | None = None  # same change with the other heat_response (None: older saved runs)
 
 
 class RotationResult(BaseModel):

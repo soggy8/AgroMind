@@ -141,3 +141,31 @@ def test_saved_runs_are_scoped_to_their_farm(api):
     other = client.post("/api/farms", json={"name": "Other farm"}).json()["id"]
     assert client.get(f"/api/farms/{other}/simulations/{run_id}").status_code == 404
     assert client.get(f"/api/farms/{other}/simulations").json() == []
+
+
+def test_published_heat_response_matches_target_and_exceeds_local(api):
+    client = api
+    req = _request(client, temp_delta_c=1)
+    req["rotations"] = [{"id": "A", "name": "Continuous maize", "crops": ["maize"]}]
+    req["field_id"] = "creek"  # current crop soybean: no rotation penalty in season 1
+    pub = client.post(f"{BASE}/run", json={**req, "scenario": {**req["scenario"], "heat_response": "published"}}).json()
+    loc = client.post(f"{BASE}/run", json={**req, "scenario": {**req["scenario"], "heat_response": "local"}}).json()
+    p, l = pub["rotations"][0]["vs_baseline"], loc["rotations"][0]["vs_baseline"]
+    assert -12.5 < p["relative_yield_change_pct"] < -8.5     # Zhao et al. 2017: USA maize -10.3% per C
+    assert l["relative_yield_change_pct"] > p["relative_yield_change_pct"]
+    assert p["other_heat_response_change_pct"] == l["relative_yield_change_pct"]
+    assert any(a["topic"] == "Response to warming" and "Zhao" in a["source"] for a in pub["assumptions"])
+
+
+def test_heat_response_does_not_change_todays_climate(api):
+    client = api
+    a = client.post(f"{BASE}/run", json=_request(client, heat_response="published")).json()
+    b = client.post(f"{BASE}/run", json=_request(client, heat_response="local")).json()
+    assert [r["relative_yield"] for r in a["rotations"]] == [r["relative_yield"] for r in b["rotations"]]
+
+
+def test_cooler_scenario_gets_no_warming_penalty(api):
+    client = api
+    body = client.post(f"{BASE}/run", json=_request(client, temp_delta_c=-1)).json()
+    for r in body["rotations"]:
+        assert r["vs_baseline"]["relative_yield_change_pct"] == r["vs_baseline"]["other_heat_response_change_pct"]

@@ -50,7 +50,9 @@ class CropParams:
     root_depth_m: float                # max effective rooting depth Zr
     depletion_p: float                 # fraction of TAW before stress
     ky: float                          # seasonal yield response factor
-    heat_tcrit_c: float                # Tmax above this in mid-season counts as heat stress
+    heat_tcrit_c: float                # Tmax above this in mid-season counts as heat stress (local rule)
+    warming_threshold_c: float         # degree-days of Tmax above this, whole season (published rule)
+    warming_target_pct: float          # published US yield change per +1 C
     monoculture_factor: float          # yield multiplier when the crop follows itself
     residue: str                       # high | medium | low (soil index)
     typical_yield_t_ha: float | None   # yield in a typical year under today's climate, after a different crop
@@ -108,11 +110,13 @@ CROPS: dict[str, CropParams] = {c.id: c for c in [
         root_depth_m=1.2, depletion_p=0.55,   # T22 (Zr range 1.0-1.7); scaled per field by the calibrated water storage multiplier
         ky=1.25,                              # T24
         heat_tcrit_c=35.0,
+        warming_threshold_c=29.0, warming_target_pct=-10.3,
         monoculture_factor=193 / 211,         # ISU A1-20: corn after corn 193 bu/ac vs after soybeans 211 bu/ac
         residue="high",
         typical_yield_t_ha=bu_ac_to_t_ha(211, CORN_LB),
         economics=ECON_MAIZE,
         sources={
+            "warming": "Schlenker & Roberts (2009) 29 C threshold; Zhao et al. (2017) PNAS, USA maize -10.3 +/- 5.4% per C",
             "stages": "FAO: FAO-56 Table 11", "kc": "FAO: Table 12 (Kc ini = cereals group value)",
             "root_depth_m": "FAO: Table 22", "depletion_p": "FAO: Table 22", "ky": "FAO: Table 24",
             "heat_tcrit_c": "ASSUME: 35 C, a commonly used maize heat threshold",
@@ -129,11 +133,13 @@ CROPS: dict[str, CropParams] = {c.id: c for c in [
         root_depth_m=1.0, depletion_p=0.50,   # Zr range 0.6-1.3
         ky=0.85,
         heat_tcrit_c=35.0,
+        warming_threshold_c=30.0, warming_target_pct=-6.8,
         monoculture_factor=0.90,
         residue="low",
         typical_yield_t_ha=bu_ac_to_t_ha(61, SOY_LB),
         economics=ECON_SOYBEAN,
         sources={
+            "warming": "Schlenker & Roberts (2009) 30 C threshold; Zhao et al. (2017), USA soybean -6.8 +/- 7.1% per C",
             "stages": "FAO: FAO-56 Table 11", "kc": "FAO: Table 12 (Kc ini = legumes group value)",
             "root_depth_m": "FAO: Table 22", "depletion_p": "FAO: Table 22", "ky": "FAO: Table 24",
             "heat_tcrit_c": "ASSUME: 35 C",
@@ -150,11 +156,13 @@ CROPS: dict[str, CropParams] = {c.id: c for c in [
         root_depth_m=1.2, depletion_p=0.55,   # Zr range 1.0-1.5
         ky=1.15,
         heat_tcrit_c=32.0,
+        warming_threshold_c=30.0, warming_target_pct=-5.5,
         monoculture_factor=0.92,
         residue="medium",
         typical_yield_t_ha=bu_ac_to_t_ha(80, OAT_LB),
         economics=ECON_OATS,
         sources={
+            "warming": "PROXY: Zhao et al. (2017) USA wheat -5.5 +/- 4.4% per C; 30 C threshold assumed",
             "stages": "FAO: FAO-56 Table 11", "kc": "FAO: Table 12",
             "root_depth_m": "FAO: Table 22", "depletion_p": "FAO: Table 22",
             "ky": "PROXY: spring wheat value from FAO-56 Table 24 (oats not listed)",
@@ -172,11 +180,13 @@ CROPS: dict[str, CropParams] = {c.id: c for c in [
         root_depth_m=1.5, depletion_p=0.55,   # Zr range 1.5-1.8
         ky=1.05,
         heat_tcrit_c=32.0,
+        warming_threshold_c=30.0, warming_target_pct=-5.5,
         monoculture_factor=0.92,
         residue="high",
         typical_yield_t_ha=None,
         economics=None,
         sources={
+            "warming": "Zhao et al. (2017), USA wheat -5.5 +/- 4.4% per C; 30 C threshold assumed",
             "stages": "FAO: FAO-56 Table 11", "kc": "FAO: Table 12",
             "root_depth_m": "FAO: Table 22", "depletion_p": "FAO: Table 22", "ky": "FAO: Table 24",
             "heat_tcrit_c": "ASSUME: 32 C", "monoculture_factor": "ASSUME", "plant_doy": "ASSUME: early October",
@@ -191,11 +201,13 @@ CROPS: dict[str, CropParams] = {c.id: c for c in [
         root_depth_m=1.2, depletion_p=0.45,   # Zr range 0.8-1.5
         ky=0.95,
         heat_tcrit_c=35.0,
+        warming_threshold_c=30.0, warming_target_pct=-6.8,
         monoculture_factor=0.88,
         residue="medium",
         typical_yield_t_ha=None,
         economics=None,
         sources={
+            "warming": "PROXY: Zhao et al. (2017) USA soybean -6.8% per C; 30 C threshold assumed",
             "stages": "FAO: FAO-56 Table 11", "kc": "FAO: Table 12 (Kc ini = oil crops group value)",
             "root_depth_m": "FAO: Table 22", "depletion_p": "FAO: Table 22", "ky": "FAO: Table 24",
             "heat_tcrit_c": "ASSUME: 35 C", "monoculture_factor": "ASSUME", "plant_doy": "ASSUME: mid May",
@@ -255,6 +267,11 @@ HEAT_LOSS_CAP = 0.40           # ASSUME
 # for central Iowa only; other locations use 1.0 (uncalibrated) - see ports.py.
 CENTRAL_IOWA_WATER_STORAGE_SCALE = 2.6  # CALIB
 DEFAULT_WATER_STORAGE_SCALE = 1.0
+
+# Warming response per crop, yield fraction lost per extra degree-day (scenario minus same year today).
+# CALIB: solved so +1 C reproduces each crop's `warming_target_pct` on the demo farm
+# (python -m app.modules.simulator.calibration). Used when Scenario.heat_response == "published".
+WARMING_K_PER_DD = {"maize": 0.0016, "soybean": 0.0012, "oats": 0.0011, "winter_wheat": 0.0006, "sunflower": 0.0013}
 
 STRESS_SEASON_THRESHOLD = 0.70  # a season below 70% of the crop's typical yield counts as poor
 NEAR_TIE_MARGIN = 0.03

@@ -20,8 +20,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from . import ports
-from .engine import et0 as et0_mod
+from .engine import crop_models, et0 as et0_mod
 from .engine import runner
+from .parameters import CROPS, DAYS_PER_YEAR, WARMING_K_PER_DD
 
 EXCLUDED_YEARS = {2013: "wet spring and late planting", 2020: "August 2020 derecho"}
 SCALES = (1.0, 1.4, 1.8, 2.2, 2.6, 3.0)
@@ -89,6 +90,35 @@ def soybean_check(scale: float, heat_loss: float, ctx) -> dict:
             "r": float(np.corrcoef(a[ok], ratio[ok])[0, 1])}
 
 
+def solve_warming_rates(scale: float, heat_loss: float) -> dict[str, dict]:
+    """Per crop, the warming rate k (per extra degree-day) that makes +1 C give the published US change.
+
+    The local model (water balance + local heat rule) runs once on today's weather and once 1 C warmer;
+    k scales the extra degree-days above the crop's warming threshold so the total change hits the target.
+    """
+    c = ports.load_sample_climate()
+    soil = ports.load_soil()
+    warm = c.with_arrays(tmax_c=c.tmax_c + 1, tmin_c=c.tmin_c + 1)
+    e, e_warm = et0_mod.climate_et0(c), et0_mod.climate_et0(warm)
+    out = {}
+    for cid, crop in CROPS.items():
+        years = 2 if crop.plant_doy + crop.season_days > DAYS_PER_YEAR else 1
+        plant = runner.single_season(cid, "other")
+        kw = dict(years=years, root_depth_scale=scale, heat_loss_per_degday=heat_loss)
+        o0, o1 = runner.run(soil, plant, c, e, **kw), runner.run(soil, plant, warm, e_warm, **kw)
+        y0, y1 = (o0.water_factor * o0.heat_factor)[0], (o1.water_factor * o1.heat_factor)[0]
+        extra = o1.warming_degree_days[0] - o0.warming_degree_days[0]
+        lo, hi = 0.0, 0.05
+        for _ in range(60):
+            k = (lo + hi) / 2
+            change = ((y1 * crop_models.warming_factor(k, extra)).mean() / y0.mean() - 1) * 100
+            lo, hi = (k, hi) if change > crop.warming_target_pct else (lo, k)
+        out[cid] = {"k": round(k, 4), "local_pct": float((y1.mean() / y0.mean() - 1) * 100),
+                    "target_pct": crop.warming_target_pct, "extra_dd": float(extra.mean()),
+                    "in_parameters": WARMING_K_PER_DD.get(cid)}
+    return out
+
+
 def report(fits: list[Fit], ctx) -> str:
     best = fits[0]
     years, ratio = ctx["years"], ctx["ratio"]
@@ -98,6 +128,9 @@ def report(fits: list[Fit], ctx) -> str:
     a = m / m.mean()
     rows = "\n".join(f"| {f.scale:.1f} | {f.heat_loss:.3f} | {f.model_std:.3f} | {f.rmse:.3f} | {f.r:+.2f} | "
                      f"{f.y2012:.2f} | {f.scenario_change_pct:+.1f}% |" for f in fits[:8])
+    rates = solve_warming_rates(best.scale, best.heat_loss)
+    rate_rows = "\n".join(f"| {CROPS[cid].name} | {r['local_pct']:+.1f}% | {r['target_pct']:+.1f}% | {r['extra_dd']:.0f} | "
+                           f"{r['k']:.4f} | {r['in_parameters']} |" for cid, r in rates.items())
     yearly = "\n".join(f"| {int(y)} | {r:.2f} | {x:.2f} |{' excluded: ' + EXCLUDED_YEARS[int(y)] if int(y) in EXCLUDED_YEARS else ''}"
                        for y, r, x in zip(years, ratio, a))
     return f"""# Simulator calibration
@@ -139,9 +172,22 @@ model spread {soy['model_std']:.3f}, r = {soy['r']:+.2f}.
    heat days) also correlate weakly with this county's yields (|r| < 0.25), so this is partly the
    county, not only the model. The simulator is fit for comparing rotations and scenarios on average,
    not for explaining a single year.
-4. **Climate sensitivity is only loosely constrained.** The chosen setting gives
-   {best.scenario_change_pct:+.1f}% maize yield for +2 C and -20% rain. Published US maize
-   sensitivities are often steeper; treat scenario effects as conservative.
+4. **The county's history implies a small response to warming.** The local model gives
+   {best.scenario_change_pct:+.1f}% maize yield for +2 C and -20% rain. The published US average is
+   several times steeper (maize -10.3% per C), so the simulator offers both and shows both numbers;
+   "published" is the default (next section).
+
+## Response to warming
+
+The county's history shows a much smaller response to heat than published US averages, so the
+simulator offers both. "Published" adds a warming response on top of the local model, applied only
+to the heat a scenario adds over the same year today; k is solved so +1 C reproduces the target.
+Targets: Zhao et al. (2017) PNAS 114:9326, USA estimates (maize -10.3 +/- 5.4, soybean -6.8 +/- 7.1,
+wheat -5.5 +/- 4.4 % per C; oats and sunflower use proxies). Thresholds follow Schlenker & Roberts (2009).
+
+| Crop | Local model, +1 C | Published target | Extra degree-days per +1 C | k solved | k in parameters.py |
+|---|---|---|---|---|---|
+{rate_rows}
 
 ## Year by year (chosen setting)
 

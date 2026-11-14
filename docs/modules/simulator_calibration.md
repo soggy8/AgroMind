@@ -44,9 +44,26 @@ model spread 0.070, r = -0.42.
    heat days) also correlate weakly with this county's yields (|r| < 0.25), so this is partly the
    county, not only the model. The simulator is fit for comparing rotations and scenarios on average,
    not for explaining a single year.
-4. **Climate sensitivity is only loosely constrained.** The chosen setting gives
-   -6.1% maize yield for +2 C and -20% rain. Published US maize
-   sensitivities are often steeper; treat scenario effects as conservative.
+4. **The county's history implies a small response to warming.** The local model gives
+   -6.1% maize yield for +2 C and -20% rain. The published US average is
+   several times steeper (maize -10.3% per C), so the simulator offers both and shows both numbers;
+   "published" is the default (next section).
+
+## Response to warming
+
+The county's history shows a much smaller response to heat than published US averages, so the
+simulator offers both. "Published" adds a warming response on top of the local model, applied only
+to the heat a scenario adds over the same year today; k is solved so +1 C reproduces the target.
+Targets: Zhao et al. (2017) PNAS 114:9326, USA estimates (maize -10.3 +/- 5.4, soybean -6.8 +/- 7.1,
+wheat -5.5 +/- 4.4 % per C; oats and sunflower use proxies). Thresholds follow Schlenker & Roberts (2009).
+
+| Crop | Local model, +1 C | Published target | Extra degree-days per +1 C | k solved | k in parameters.py |
+|---|---|---|---|---|---|
+| Maize | -1.6% | -10.3% | 59 | 0.0016 | 0.0016 |
+| Soybean | -1.7% | -6.8% | 45 | 0.0012 | 0.0012 |
+| Oats | -2.2% | -5.5% | 34 | 0.0011 | 0.0011 |
+| Winter wheat | -3.2% | -5.5% | 40 | 0.0006 | 0.0006 |
+| Sunflower | -1.3% | -6.8% | 44 | 0.0013 | 0.0013 |
 
 ## Year by year (chosen setting)
 

@@ -1,6 +1,7 @@
 """Simulator orchestration. The only file other modules may import."""
 from __future__ import annotations
 
+from dataclasses import replace
 from functools import lru_cache
 
 import numpy as np
@@ -8,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from . import advisor, ports, ranking, rotations, scenarios, store
 from .economics import costs, revenue
-from .engine import runner, soil_health
+from .engine import crop_models, runner, soil_health
 from .engine.types import Climate, EnsembleOutcome, FieldSnapshot
 from .parameters import (CROPS, HEAT_LOSS_PER_DEGDAY, IRRIGATION_COST_SOURCE, MODEL_VERSION,
-                         STRESS_SEASON_THRESHOLD)
+                         STRESS_SEASON_THRESHOLD, WARMING_K_PER_DD)
 from .schemas import (AdvisorContext, Assumption, CropOption, Economics, FarmInfo, FieldOption, Priorities,
                       RotationInput, RotationResult, SavedRun, SavedRunSummary, SeasonResult, SimulationRequest,
                       SimulationResult, SimulatorOptions, SoilIndex, Stat, VsBaseline)
@@ -95,9 +96,12 @@ def run_simulation(session: Session, farm_id: str, req: SimulationRequest) -> Si
         plantings = rotations.schedule(rot.crops, sc.years, field.previous_crop_id)
         if not plantings:
             raise InvalidRotation(f"'{rot.name}' doesn't fit a single season into {sc.years} year(s). Add years.")
-        out_s = runner.run(field.soil, plantings, scen_climate, et0_scen, **kwargs)
-        out_b = out_s if scen_climate is climate else runner.run(field.soil, plantings, climate, et0_base, **kwargs)
-        results.append(_rotation_result(idx, rot, out_s, out_b, sc.years, req.include_economics, sc.price_change_pct))
+        local = runner.run(field.soil, plantings, scen_climate, et0_scen, **kwargs)
+        out_b = local if scen_climate is climate else runner.run(field.soil, plantings, climate, et0_base, **kwargs)
+        published = _with_published_warming(local, out_b)
+        main, other = (published, local) if sc.heat_response == "published" else (local, published)
+        results.append(_rotation_result(idx, rot, main, out_b, other, sc.years, req.include_economics,
+                                        sc.price_change_pct))
 
     ordered, recommendation = ranking.rank(results, priorities, req.include_economics)
     notes = [data_note, "Model estimates, not forecasts: results show how each rotation responds to past weather "
@@ -120,12 +124,20 @@ def run_simulation(session: Session, farm_id: str, req: SimulationRequest) -> Si
     )
 
 
+def _with_published_warming(o: EnsembleOutcome, base: EnsembleOutcome) -> EnsembleOutcome:
+    """Apply the published US warming response to the heat the scenario adds over the same year today."""
+    k = np.array([[WARMING_K_PER_DD[pl.crop_id]] for pl in o.plantings]).reshape(len(o.plantings), 1)
+    f = crop_models.warming_factor(k, o.warming_degree_days - base.warming_degree_days)
+    return replace(o, heat_factor=o.heat_factor * f, relative_yield=o.relative_yield * f)
+
+
 def _stat(values: np.ndarray, unit: str, digits: int = 3) -> Stat:
     p10, p50, p90 = np.percentile(values, [10, 50, 90])
     return Stat(p10=round(float(p10), digits), p50=round(float(p50), digits), p90=round(float(p90), digits), unit=unit)
 
 
-def _rotation_result(idx: int, rot: RotationInput, o: EnsembleOutcome, base: EnsembleOutcome, years: int,
+def _rotation_result(idx: int, rot: RotationInput, o: EnsembleOutcome, base: EnsembleOutcome,
+                     other: EnsembleOutcome, years: int,
                      include_economics: bool, price_change_pct: float) -> RotationResult:
     econ_ok = include_economics and all(revenue.has_economics(pl.crop_id) for pl in o.plantings)
     margins = None
@@ -188,6 +200,8 @@ def _rotation_result(idx: int, rot: RotationInput, o: EnsembleOutcome, base: Ens
             relative_yield_change_pct=round(float((per_track_yield.mean() / base_yield.mean() - 1) * 100), 1),
             irrigation_change_mm_per_year=round(float(irr_year.mean() - (base.irrigation_mm.sum(axis=0) / years).mean()), 1),
             stress_frequency_change=round(stress - base_stress, 4),
+            other_heat_response_change_pct=round(
+                float((other.relative_yield.mean(axis=0).mean() / base_yield.mean() - 1) * 100), 1),
         ),
         soil=SoilIndex(score=score, components=components, notes=notes),
         economics=economics, indicator_scores={}, score=0.0, rank=0,
@@ -200,9 +214,9 @@ def _assumptions(field: FieldSnapshot, crop_ids: tuple[str, ...], req: Simulatio
                    "(Penman-Monteith), daily soil water balance.", source="FAO-56 Eq. 6, ch. 6 and 8"),
         Assumption(topic="Yield response to water", text="Yield falls with the seasonal shortfall of water use "
                    "against need, scaled by a crop factor Ky.", source="FAO-56 Eq. 90, Table 24"),
-        Assumption(topic="Heat", text=f"Mid-season days above the crop's heat threshold cost "
+        Assumption(topic="Heat in today's weather", text=f"Mid-season days above the crop's heat threshold cost "
                    f"{HEAT_LOSS_PER_DEGDAY * 100:.1f}% yield per degree-day.",
-                   source="Calibrated against USDA NASS Story County yields; weakly constrained"),
+                   source="Calibrated against USDA NASS Story County yields"),
         Assumption(topic="Soil water", text=f"{field.soil.description}: {field.soil.awc_mm_per_m:.0f} mm available "
                    f"water per metre of soil.", source=field.soil.source),
         Assumption(topic="Effective water storage",
@@ -216,6 +230,17 @@ def _assumptions(field: FieldSnapshot, crop_ids: tuple[str, ...], req: Simulatio
         Assumption(topic="Typical yield", text="100% = the crop's average modelled yield under today's climate, "
                    "rain-fed, after a different crop.", source="Model definition"),
     ]
+    if scenario_applied and req.scenario.heat_response == "published":
+        a.append(Assumption(topic="Response to warming", text="Each extra degree-day above the crop's threshold "
+                            "(29 C maize, 30 C others) that the scenario adds costs yield at a rate set so that +1 C "
+                            "reproduces the published US average: maize -10.3%, soybean -6.8%, wheat and oats -5.5% "
+                            "per C. This county's own history suggests a much smaller response; see the other setting.",
+                            source="Zhao et al. (2017) PNAS 114:9326; Schlenker & Roberts (2009) PNAS 106:15594"))
+    elif scenario_applied:
+        a.append(Assumption(topic="Response to warming", text="Uses only this county's 2001-2025 history, which "
+                            "shows a small response to heat (2012 lost about 12%). Published US averages are "
+                            "several times larger; see the other setting.",
+                            source="Calibrated against USDA NASS Story County yields"))
     if scenario_applied:
         a.append(Assumption(topic="Scenario", text="Temperature is added to every day and rain is scaled on every "
                             "wet day. Humidity, wind and sunshine stay as observed. Not a climate projection.",

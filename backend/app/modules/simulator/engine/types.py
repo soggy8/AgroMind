@@ -84,6 +84,7 @@ class EnsembleOutcome:
     irrigation_mm: np.ndarray
     heat_degree_days: np.ndarray
     heat_stress_days: np.ndarray
+    warming_degree_days: np.ndarray  # Tmax above the crop's warming threshold, summed over the season
     water_factor: np.ndarray    # 1 - Ky (1 - ETa/ETc), clipped to [0, 1]
     heat_factor: np.ndarray
     rotation_factor: np.ndarray

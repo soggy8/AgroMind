@@ -18,6 +18,8 @@ export function ChangeVsToday({ result }: { result: SimulationResult }) {
         {result.rotations.map((r) => {
           const d = r.vs_baseline.relative_yield_change_pct;
           const poorDelta = r.vs_baseline.stress_frequency_change;
+          const alt = r.vs_baseline.other_heat_response_change_pct;
+          const altLabel = result.scenario.heat_response === "published" ? "county history" : "US research";
           return (
             <li key={r.rotation_id} className="grid grid-cols-[1fr_auto] gap-x-3 border-b border-line py-2.5 last:border-0">
               <div className="flex min-w-0 items-center gap-2 text-sm font-semibold">
@@ -38,6 +40,7 @@ export function ChangeVsToday({ result }: { result: SimulationResult }) {
               <div className="pl-6 text-[12px] text-mut">
                 {pct(r.relative_yield.p50)} of typical ({pctRange(r.relative_yield)})
                 {!today && Math.abs(poorDelta) >= 0.005 && <> · poor seasons {signed(poorDelta * 100)} pts</>}
+                {!today && alt !== null && Math.abs(alt - d) >= 0.5 && <span className="block">With {altLabel}: {signed(alt)}%</span>}
               </div>
             </li>
           );

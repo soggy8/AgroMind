@@ -2,6 +2,7 @@
 
 export type Kind = "observed" | "modelled" | "scenario";
 export type IrrigationMode = "none" | "limited" | "full";
+export type HeatResponse = "published" | "local";
 export type IndicatorId = "yield" | "water" | "risk" | "soil" | "margin";
 
 export const MAX_ROTATIONS = 4;
@@ -15,6 +16,7 @@ export interface Scenario {
   irrigation_cap_mm: number | null; // per season, required when irrigation is "limited"
   years: number; // 1 .. 10
   price_change_pct: number; // -40 .. 40, economics only
+  heat_response: HeatResponse; // published US average (default) or this county's history
 }
 
 export interface RotationInput {
@@ -91,6 +93,7 @@ export interface VsBaseline {
   relative_yield_change_pct: number;
   irrigation_change_mm_per_year: number;
   stress_frequency_change: number;
+  other_heat_response_change_pct: number | null; // same change with the other heat_response
 }
 
 export interface RotationResult {

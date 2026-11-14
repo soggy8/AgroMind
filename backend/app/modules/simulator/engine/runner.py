@@ -37,7 +37,7 @@ def run(soil: SoilProfile, plantings: Sequence[Planting], climate: Climate, et0:
     mid_by_season = [crop_models.is_mid_season(c, np.arange(c.season_days)) for c in crops]
 
     shape = (n_seasons, n_tracks)
-    acc = {k: np.zeros(shape) for k in ("etc", "eta", "rain", "irr", "hdd", "hdays")}
+    acc = {k: np.zeros(shape) for k in ("etc", "eta", "rain", "irr", "hdd", "hdays", "wdd")}
     irrigation_left = np.zeros(n_tracks)
     depletion = np.zeros(n_tracks)  # start at field capacity on Jan 1 (winter recharge)
     track = np.arange(n_tracks)
@@ -69,8 +69,10 @@ def run(soil: SoilProfile, plantings: Sequence[Planting], climate: Climate, et0:
         acc["eta"][s] += fx.eta
         acc["rain"][s] += rain
         acc["irr"][s] += fx.irrigation
+        tmax = climate.tmax_c[year_idx, doy]
+        acc["wdd"][s] += np.maximum(tmax - crop.warming_threshold_c, 0.0)
         if mid_by_season[s][dap]:
-            excess = np.maximum(climate.tmax_c[year_idx, doy] - crop.heat_tcrit_c, 0.0)
+            excess = np.maximum(tmax - crop.heat_tcrit_c, 0.0)
             acc["hdd"][s] += excess
             acc["hdays"][s] += excess > 0
 
@@ -87,6 +89,7 @@ def run(soil: SoilProfile, plantings: Sequence[Planting], climate: Climate, et0:
     return EnsembleOutcome(
         plantings=tuple(plantings), etc_mm=acc["etc"], eta_mm=acc["eta"], rain_mm=acc["rain"],
         irrigation_mm=acc["irr"], heat_degree_days=acc["hdd"], heat_stress_days=acc["hdays"],
+        warming_degree_days=acc["wdd"],
         water_factor=wf, heat_factor=hf, rotation_factor=rot, relative_yield=relative,
         start_years=tuple(climate.years),
     )
