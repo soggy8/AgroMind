@@ -34,3 +34,7 @@ data/processed/*
 .DS_Store
 .idea/
 .vscode/
+
+# Simulator runtime data
+backend/var/
+data/cache/

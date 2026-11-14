@@ -7,7 +7,7 @@ NASA Space Apps project: a farm digital twin with a crop-rotation simulator. Thr
 
 - `README.md`: module boundaries and dependency rules.
 - `DESIGN.md`: the visual system and the honesty rules for any UI work.
-- For Simulator work: `docs/modules/simulator.md` is the spec. Follow its build order (section 7).
+- For Simulator work: `docs/modules/simulator.md` is the spec and status (what's left: section 8).
 
 ## Rules for every module
 
@@ -29,10 +29,12 @@ NASA Space Apps project: a farm digital twin with a crop-rotation simulator. Thr
 - `engine/` stays pure: no FastAPI, pydantic, database or network imports.
 - Don't change a value marked FAO in `parameters.py` without the table reference. Values marked
   ASSUME may be tuned during calibration; record what changed and why in the spec.
-- The model currently overstates stress (spec section 4). Don't present t/ha or absolute yield
-  as a prediction; lead with change versus today's climate.
-- Backend tests: `cd backend && pytest tests/simulator`. No project config exists yet
-  (`pyproject.toml`, `package.json`): agree versions with the team before adding them.
+- The model is calibrated only for the demo grid cell and has weak year-to-year skill
+  (`docs/modules/simulator_calibration.md`). Don't present t/ha or absolute yield as a
+  prediction; lead with change versus today's climate. Rerun the calibration after changing
+  anything in `engine/` or `parameters.py`.
+- Field data, weather and saved runs go through `ports.py` and `store.py` only.
+- Checks: `cd backend && pytest tests/simulator`; `cd frontend && npm run build`.
 
 ## Commits
 

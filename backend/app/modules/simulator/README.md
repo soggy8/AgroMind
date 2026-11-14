@@ -2,29 +2,26 @@
 
 **Owns:** what-if experiments. A decision-support model, not a harvest prediction.
 
-Inputs: a CropTwin field + rotation(s) + scenario (temperature, rainfall, irrigation, years).
-Outputs: relative yield, water need, irrigation, stress risk, a rotation soil index, optional
-economics, all with p10-p90 ranges, a ranked recommendation, and the list of assumptions.
+Inputs: a field + up to four rotations + a scenario (temperature, rainfall, irrigation, years,
+prices). Outputs: yield relative to a typical year, change vs today's climate, water need and
+irrigation, poor-season risk, a rotation soil index, optional economics, all with p10-p90 ranges
+across 25 weather years, plus a ranked recommendation and every assumption with its source.
 
-**Full spec: `docs/modules/simulator.md`.** Read it before changing anything here.
+**Spec and status: `docs/modules/simulator.md`.** Calibration: `docs/modules/simulator_calibration.md`.
 
-| File | Responsibility | State |
-|---|---|---|
-| `schemas.py` | API contract (mirrored in the frontend `types.ts`) | written |
-| `parameters.py` | Crop and soil parameters with sources; engine constants | written |
-| `engine/types.py` | Data types crossing the engine boundary | written |
-| `engine/et0.py` | Reference evapotranspiration | to create |
-| `engine/water_balance.py` | Daily root-zone water balance | empty |
-| `engine/crop_models.py` | Kc curve; water, heat and rotation yield factors | empty |
-| `engine/soil_health.py` | Rotation soil index | empty |
-| `engine/runner.py` | Ensemble loop over weather years; aggregation | to create |
-| `scenarios.py` | Apply a scenario to weather; presets; climate summaries | empty |
-| `rotations.py` | Validate rotations; schedule plantings; suggested rotations | empty |
-| `ranking.py` | Indicator scores, ranking, recommendation text | empty |
-| `ports.py` | The only access to `croptwin.service` and `shared.connectors` | to create |
-| `models.py` | Saved runs table | to create |
-| `economics/` | Optional costs and revenue | empty |
-| `service.py` / `router.py` | Orchestration / `/api/farms/{id}/simulations` | empty |
+| File | Responsibility |
+|---|---|
+| `router.py` / `service.py` | `/api/farms/{id}/simulations`; orchestration (the only import for other modules) |
+| `schemas.py` | API contract, mirrored by the frontend `types.ts` |
+| `parameters.py` | Crop, soil and economic values, each with a source |
+| `ports.py` | The only access to field data and weather (demo stand-ins for now) |
+| `rotations.py`, `scenarios.py`, `ranking.py` | Schedule, scenario shifts, scoring and recommendation text |
+| `engine/` | Pure model: ET0, soil water, crop factors, water balance, soil index, ensemble runner |
+| `economics/` | Costs and revenue |
+| `store.py` | Saved runs (JSON files until `shared/db` is used) |
+| `advisor.py` | Facts for the AI advisor |
+| `calibration.py` | `python -m app.modules.simulator.calibration --write` |
 
-Rules: `engine/` is pure (no FastAPI, pydantic, database, network). Depends on
-`shared.connectors` and `croptwin.service` through `ports.py` only. Must not import `cropdoctor`.
+Rules: `engine/` is pure (no FastAPI, pydantic, database, network). Depends on CropTwin and
+shared connectors through `ports.py` only. Must not import `cropdoctor`.
+Tests: `pytest tests/simulator` from `backend/`.

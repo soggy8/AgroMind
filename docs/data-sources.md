@@ -13,3 +13,17 @@ Verify availability, resolution, coverage, access, and licensing before implemen
 | ECOSTRESS, GRACE-FO | ET / water storage | — | Stretch goals |
 
 Earthdata Login is required for SMAP, MODIS, Landsat, GPM (see `.env.example`).
+
+## Used by the Simulator (verified 2026-11-14)
+
+| Source | Use | Where |
+|---|---|---|
+| NASA POWER daily point API, community `AG` | Weather 2001-2025: Tmax, Tmin, precipitation, solar, RH, wind | `data/samples/power_daily_story_county_ia_2001_2025.csv`; live fetch in `simulator/ports.py` |
+| ISRIC SoilGrids v2.0 REST API | Sand, clay, organic carbon, pH at the demo farm | `data/samples/soilgrids_story_county_ia.json` |
+| FAO-56 (Allen et al. 1998) | Crop coefficients, stage lengths, rooting depth, Ky, soil water table | `simulator/parameters.py` |
+| USDA NASS county yields via ISU Ag Decision Maker A1-12 | Story County maize 2001-2025, soybean 2016-2025, for calibration | `data/samples/nass_story_county_yields.csv` |
+| ISU Ag Decision Maker A1-20 (2026) | Iowa production costs and budget yields | `simulator/parameters.py` |
+| USDA WASDE, November 2026 | 2026/27 projected farm prices | `simulator/parameters.py` |
+
+The NASS Quick Stats API needs a free key; the county yields above were transcribed from ISU's
+published tables instead.

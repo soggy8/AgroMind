@@ -14,6 +14,7 @@ export interface Scenario {
   irrigation: IrrigationMode;
   irrigation_cap_mm: number | null; // per season, required when irrigation is "limited"
   years: number; // 1 .. 10
+  price_change_pct: number; // -40 .. 40, economics only
 }
 
 export interface RotationInput {
@@ -41,6 +42,7 @@ export interface Stat {
   unit: string;
 }
 
+/** Growing-season (May-Sep) averages per year. */
 export interface ClimateSummary {
   kind: Kind;
   source: string;
@@ -48,11 +50,16 @@ export interface ClimateSummary {
   growing_season_tmax_c: number;
   growing_season_et0_mm: number;
   hot_days_per_year: number;
+  driest_year: number;
+  driest_year_rain_mm: number;
 }
 
 export interface SeasonResult {
   season_index: number;
   crop_id: string;
+  year: number; // simulated year of harvest, 1-based
+  plant_date: string;
+  harvest_date: string;
   relative_yield: Stat;
   yield_t_ha: Stat | null;
   crop_water_need_mm: Stat;
@@ -61,6 +68,7 @@ export interface SeasonResult {
   water_stress: Stat;
   heat_stress_days: Stat;
   limiting_factor: "none" | "water" | "heat" | "rotation";
+  margin_per_ha: Stat | null;
 }
 
 export interface Economics {
@@ -69,6 +77,8 @@ export interface Economics {
   margin_per_ha: Stat;
   currency: string;
   price_source: string;
+  cost_source: string;
+  notes: string[];
 }
 
 export interface SoilIndex {
@@ -85,6 +95,7 @@ export interface VsBaseline {
 
 export interface RotationResult {
   rotation_id: string;
+  input_index: number; // position in the request: keeps the rotation's colour stable
   name: string;
   crops: string[];
   seasons: SeasonResult[];
@@ -92,6 +103,7 @@ export interface RotationResult {
   irrigation_mm_per_year: Stat;
   rain_sufficiency: Stat;
   stress_season_frequency: number;
+  by_start_year: number[]; // aligned with SimulationResult.ensemble_start_years
   vs_baseline: VsBaseline;
   soil: SoilIndex;
   economics: Economics | null;
@@ -117,6 +129,9 @@ export interface Assumption {
 export interface SimulationResult {
   kind: "modelled";
   field_id: string;
+  field_name: string;
+  soil: string;
+  calibrated: boolean;
   scenario: Scenario;
   priorities: Priorities;
   baseline_climate: ClimateSummary;
@@ -125,6 +140,8 @@ export interface SimulationResult {
   recommendation: Recommendation;
   assumptions: Assumption[];
   ensemble_size: number;
+  ensemble_start_years: number[];
+  economics_included: boolean;
   data_note: string;
   model_version: string;
 }
@@ -145,7 +162,28 @@ export interface ScenarioPreset {
   scenario: Scenario;
 }
 
+export interface FieldOption {
+  id: string;
+  name: string;
+  crop_id: string;
+  area_ha: number;
+  boundary: [number, number][]; // (lat, lon) ring
+  soil: string;
+  irrigation_available: boolean;
+}
+
+export interface FarmInfo {
+  id: string;
+  name: string;
+  region: string;
+  center: [number, number];
+}
+
 export interface SimulatorOptions {
+  farm: FarmInfo;
+  fields: FieldOption[];
+  weather_source: string;
+  calibration_note: string;
   crops: CropOption[];
   suggested_rotations: RotationInput[];
   scenario_presets: ScenarioPreset[];
@@ -172,4 +210,12 @@ export interface SavedRunSummary {
 export interface SavedRun extends SavedRunSummary {
   request: SimulationRequest;
   result: SimulationResult;
+}
+
+// ---------- advisor hand-off ----------
+
+export interface AdvisorContext {
+  instructions: string;
+  facts: string[];
+  suggested_questions: string[];
 }

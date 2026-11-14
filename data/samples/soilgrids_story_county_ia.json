@@ -1,0 +1,10 @@
+{
+  "_source": "ISRIC SoilGrids v2.0 REST API, https://rest.isric.org/soilgrids/v2.0/properties/query?lon=-93.46&lat=42.03 (queried 2026-11-14). Values converted from mapped units (g/kg, pH*10) to percent and pH.",
+  "lat": 42.03,
+  "lon": -93.46,
+  "layers": [
+    {"depth": "0-5cm",    "clay_pct": 33.9, "sand_pct": 32.2, "silt_pct": 33.9, "soc_g_kg": 22.8, "ph": 6.5},
+    {"depth": "30-60cm",  "clay_pct": 35.2, "sand_pct": 31.5, "silt_pct": 33.3, "soc_g_kg": 7.7,  "ph": 6.6},
+    {"depth": "60-100cm", "clay_pct": 34.4, "sand_pct": 32.0, "silt_pct": 33.6, "soc_g_kg": 3.3,  "ph": 7.2}
+  ]
+}

@@ -1,0 +1,69 @@
+import { Droplets, Repeat, Thermometer } from "lucide-react";
+import { KindTag } from "../../../shared/components";
+import { pct, pctRange } from "../lib/format";
+import { rotationColor } from "../lib/rotationColors";
+import type { CropOption, SeasonResult, SimulationResult } from "../types";
+
+const LIMIT = {
+  water: { icon: Droplets, label: "water-limited", cls: "text-rain" },
+  heat: { icon: Thermometer, label: "heat-limited", cls: "text-heat" },
+  rotation: { icon: Repeat, label: "follows itself", cls: "text-soil" },
+} as const;
+
+/** Season by season: what is planted when, and how each season fares across weather years. */
+export function SeasonTable({ result, crops }: { result: SimulationResult; crops: CropOption[] }) {
+  const name = (id: string) => crops.find((c) => c.id === id)?.name ?? id;
+  const rots = [...result.rotations].sort((a, b) => a.input_index - b.input_index);
+  return (
+    <section aria-labelledby="seasons-h" className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 id="seasons-h" className="text-[15px] font-bold">Season by season</h3>
+        <KindTag kind="modelled" />
+      </div>
+      {rots.map((r) => (
+        <div key={r.rotation_id}>
+          <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+            <i aria-hidden className="h-2 w-2 rounded-[3px]" style={{ background: rotationColor(r.input_index) }} />
+            {r.name}
+          </div>
+          <ol className="space-y-1">
+            {r.seasons.map((s) => <SeasonRow key={s.season_index} s={s} cropName={name(s.crop_id)} />)}
+          </ol>
+        </div>
+      ))}
+      <p className="text-[12px] leading-snug text-mut">
+        Yield as a share of the crop&apos;s typical yield in today&apos;s climate; range across {result.ensemble_size} weather years.
+        Icons show the main limit in a median year.
+      </p>
+    </section>
+  );
+}
+
+function SeasonRow({ s, cropName }: { s: SeasonResult; cropName: string }) {
+  const limit = s.limiting_factor === "none" ? null : LIMIT[s.limiting_factor];
+  return (
+    <li className="grid grid-cols-[52px_1fr_auto] items-center gap-2 rounded-chip bg-glass-hi px-2.5 py-2">
+      <span className="text-[12px] font-bold text-mut">Year {s.year}</span>
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5 text-sm font-semibold">
+          {cropName}
+          {limit && (
+            <span className={`inline-flex items-center gap-1 text-[12px] font-semibold ${limit.cls}`}>
+              <limit.icon size={13} strokeWidth={1.75} aria-hidden />{limit.label}
+            </span>
+          )}
+        </span>
+        <span className="block text-[12px] text-mut">
+          {s.plant_date} – {s.harvest_date} · needs {Math.round(s.crop_water_need_mm.p50)} mm
+          {s.irrigation_mm.p50 >= 1 && <> · irrigated {Math.round(s.irrigation_mm.p50)} mm</>}
+        </span>
+      </span>
+      <span className="text-right">
+        <span className="block text-[15px] font-extrabold">{pct(s.relative_yield.p50)}</span>
+        <span className="block text-[12px] text-mut">
+          {s.yield_t_ha ? `${s.yield_t_ha.p50.toFixed(1)} t/ha` : pctRange(s.relative_yield)}
+        </span>
+      </span>
+    </li>
+  );
+}

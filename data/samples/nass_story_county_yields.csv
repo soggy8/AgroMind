@@ -1,0 +1,32 @@
+# USDA NASS county yield estimates, Story County, Iowa (bushels per acre, non-irrigated).
+# Transcribed from Iowa State University Ag Decision Maker File A1-12:
+#   2016-2025: current edition, https://www.extension.iastate.edu/agdm/crops/pdf/a1-12.pdf (Table 5)
+#   2006-2015: 2016 edition (web.archive.org snapshot of the same URL, Sept 2016)
+#   2001-2010: 2011 edition (web.archive.org snapshot of the same URL, Sept 2011); 2006-2010 agree across editions
+# Soybean values before 2016 were not collected. Empty = not available.
+year,corn_bu_ac,soybean_bu_ac
+2001,150,
+2002,177,
+2003,165,
+2004,188,
+2005,188,
+2006,184,
+2007,181,
+2008,160,
+2009,175,
+2010,164,
+2011,163,
+2012,158,
+2013,137,
+2014,170,
+2015,188,
+2016,211.9,58.4
+2017,200.3,57.9
+2018,192.3,52.8
+2019,189.3,50.0
+2020,148.4,52.2
+2021,201.2,63.6
+2022,207.1,60.0
+2023,211.4,64.1
+2024,215.5,63.2
+2025,204.0,63.6
