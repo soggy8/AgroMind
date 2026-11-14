@@ -17,9 +17,11 @@ missing is listed in section 8.
 
 ```bash
 # Backend (from backend/)
-pip install -e ".[dev]"
+pip install -e ".[dev]"                  # or use the existing backend/.venv
+alembic upgrade head                     # farms, fields, soil, saved runs
+python -m app.modules.croptwin.seed      # demo farm (ids demo / north / creek / west)
 uvicorn app.main:app --reload --port 8000
-pytest tests/simulator
+pytest                                   # all modules; simulator tests use an in-memory DB
 python -m app.modules.simulator.calibration --write   # regenerate the calibration report
 
 # Frontend (from frontend/)
@@ -69,7 +71,8 @@ backend/app/modules/simulator/
 ├── scenarios.py     apply a scenario to weather, presets, climate summaries
 ├── ranking.py       indicator scores, ranking, recommendation text
 ├── advisor.py       fact list for the AI advisor
-├── store.py         saved runs (JSON files under backend/var/simulator_runs/)
+├── models.py        SimulationRun table (saved runs)
+├── store.py         saved runs: save / list / get / delete
 ├── calibration.py   CLI: fit against USDA NASS county yields, write the report
 ├── engine/
 │   ├── types.py         Climate (n_years x 365 arrays), SoilProfile, FieldSnapshot, Planting, EnsembleOutcome
@@ -212,22 +215,21 @@ horizontal scroll on phones.
 
 | Need | From | Today |
 |---|---|---|
-| Farm, fields, boundaries, current crop, priorities | `croptwin.service` | `ports.DEMO_FARM`: three rectangles over farmland north of the town, 39 / 24 / 31 ha |
-| Soil composition | `croptwin` (SoilGrids) | `data/samples/soilgrids_story_county_ia.json` |
-| Daily weather | `shared/connectors/nasa_power.py` | `ports.load_climate`: sample file for the demo cell, live POWER with disk cache elsewhere |
-| Saved runs table | `shared/db` | JSON files (`store.py`, same four functions) |
-| AI answers | `shared/advisor` | `POST .../advisor-context` returns the facts; the UI shows them |
+| Farm, fields, boundaries, current crop, priorities | `croptwin.service` | **Connected** (`ports.get_farm`, `ports.load_field`) |
+| Soil | CropTwin soil layers, else the field's texture class, else assumed loam (said in the UI) | **Connected** |
+| Daily weather | `shared/connectors/nasa_power.py` | Not built yet: `ports.load_climate` uses the committed sample for the demo cell, live POWER with a disk cache elsewhere |
+| Saved runs | `shared/db` | **Connected**: table `simulation_runs` (migration 0002), `store.py` |
+| AI answers | `shared/advisor` | Not built yet: `POST .../advisor-context` returns the facts; the UI shows them |
 
-When CropTwin and the connectors land, change only `ports.py` (and `store.py` for the database).
+Every service function takes the request's database session, like CropTwin's.
 
 ---
 
 ## 8. Still to do
 
-1. Swap `ports.py` to `croptwin.service` and the shared POWER connector once they exist.
-2. Move saved runs to `shared/db`.
-3. Connect the advisor drawer to `shared/advisor` once it exists.
-4. Calibrate more: soybean timing, a second county, and the heat rule against a published
+1. Swap `ports.load_climate` to the shared POWER connector once it exists.
+2. Connect the advisor drawer to `shared/advisor` once it exists.
+3. Calibrate more: soybean timing, a second county, and the heat rule against a published
    sensitivity.
-5. Replace ASSUME values (oats costs, planting dates, non-maize rotation penalties) with sources.
-6. Optional: code-split the map and chart libraries (the production bundle is about 600 kB).
+4. Replace ASSUME values (oats costs, planting dates, non-maize rotation penalties) with sources.
+5. Optional: code-split the map and chart libraries (the production bundle is about 600 kB).

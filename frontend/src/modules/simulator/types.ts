@@ -165,7 +165,7 @@ export interface ScenarioPreset {
 export interface FieldOption {
   id: string;
   name: string;
-  crop_id: string;
+  crop_id: string | null; // current crop, if CropTwin knows it
   area_ha: number;
   boundary: [number, number][]; // (lat, lon) ring
   soil: string;
@@ -175,8 +175,8 @@ export interface FieldOption {
 export interface FarmInfo {
   id: string;
   name: string;
-  region: string;
-  center: [number, number];
+  region: string | null;
+  center: [number, number] | null; // null when the farm has no fields yet
 }
 
 export interface SimulatorOptions {

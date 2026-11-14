@@ -4,7 +4,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeVar
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy.orm import Session
+
+from app.shared.db import get_session
 
 from . import service
 from .schemas import (AdvisorContext, SavedRun, SavedRunSummary, SaveRunRequest, SimulationRequest,
@@ -12,6 +15,7 @@ from .schemas import (AdvisorContext, SavedRun, SavedRunSummary, SaveRunRequest,
 
 router = APIRouter(prefix="/api/farms/{farm_id}/simulations", tags=["simulator"])
 T = TypeVar("T")
+DB = Depends(get_session)
 
 
 def _call(fn: Callable[..., T], *args) -> T:
@@ -26,13 +30,13 @@ def _call(fn: Callable[..., T], *args) -> T:
 
 
 @router.get("/options", response_model=SimulatorOptions)
-def get_options(farm_id: str):
-    return _call(service.get_options, farm_id)
+def get_options(farm_id: str, session: Session = DB):
+    return _call(service.get_options, session, farm_id)
 
 
 @router.post("/run", response_model=SimulationResult)
-def run(farm_id: str, body: SimulationRequest):
-    return _call(service.run_simulation, farm_id, body)
+def run(farm_id: str, body: SimulationRequest, session: Session = DB):
+    return _call(service.run_simulation, session, farm_id, body)
 
 
 @router.post("/advisor-context", response_model=AdvisorContext)
@@ -41,21 +45,21 @@ def advisor_context(farm_id: str, body: SimulationResult):
 
 
 @router.post("", response_model=SavedRun, status_code=201)
-def save(farm_id: str, body: SaveRunRequest):
-    return _call(service.save_run, farm_id, body.name, body.request)
+def save(farm_id: str, body: SaveRunRequest, session: Session = DB):
+    return _call(service.save_run, session, farm_id, body.name, body.request)
 
 
 @router.get("", response_model=list[SavedRunSummary])
-def list_runs(farm_id: str):
-    return _call(service.list_runs, farm_id)
+def list_runs(farm_id: str, session: Session = DB):
+    return _call(service.list_runs, session, farm_id)
 
 
 @router.get("/{run_id}", response_model=SavedRun)
-def get_run(farm_id: str, run_id: str):
-    return _call(service.get_run, farm_id, run_id)
+def get_run(farm_id: str, run_id: str, session: Session = DB):
+    return _call(service.get_run, session, farm_id, run_id)
 
 
 @router.delete("/{run_id}", status_code=204)
-def delete_run(farm_id: str, run_id: str):
-    _call(service.delete_run, farm_id, run_id)
+def delete_run(farm_id: str, run_id: str, session: Session = DB):
+    _call(service.delete_run, session, farm_id, run_id)
     return Response(status_code=204)

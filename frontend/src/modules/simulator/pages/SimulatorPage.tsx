@@ -43,7 +43,7 @@ export function SimulatorPage({ route, onNavigate }: { route: Route; onNavigate:
 
   const topBar = (
     <TopBar route={route} onNavigate={onNavigate} farmName={options?.farm.name ?? "Demo Farm"}
-      region={options?.farm.region ?? "Story County, Iowa"}
+      region={options?.farm.region ?? undefined}
       actions={
         <Button onClick={() => setAdvisorOpen(true)}>
           <MessageSquareText size={16} strokeWidth={1.75} />
@@ -69,11 +69,28 @@ export function SimulatorPage({ route, onNavigate }: { route: Route; onNavigate:
 
   const fields = options?.fields.map((f) => ({
     id: f.id, name: f.name, boundary: f.boundary,
-    chip: `${options.crops.find((c) => c.id === f.crop_id)?.name ?? f.crop_id} · ${f.area_ha} ha`,
+    chip: `${f.crop_id ? `${options.crops.find((c) => c.id === f.crop_id)?.name ?? f.crop_id} · ` : ""}${f.area_ha} ha`,
   })) ?? [];
 
-  const map = options && (
-    <FarmMap fields={fields} selectedId={draft?.fieldId} onSelect={sim.actions.setField} center={options.farm.center}
+  if (options && options.fields.length === 0) {
+    return (
+      <div className="flex min-h-full flex-col">
+        {topBar}
+        <main className="grid flex-1 place-items-center p-6">
+          <Glass className="max-w-md p-6">
+            <h1 className="text-[21px] font-bold tracking-[-.01em]">Draw your first field</h1>
+            <p className="mt-2 text-sm leading-normal text-mut">
+              {options.farm.name} has no fields yet. Add one in the farm profile, then come back to compare rotations on it.
+            </p>
+            <Button variant="primary" className="mt-5" onClick={() => onNavigate("farm-profile")}>Open farm profile</Button>
+          </Glass>
+        </main>
+      </div>
+    );
+  }
+
+  const map = options?.farm.center && (
+    <FarmMap fields={fields} selectedId={draft?.fieldId} onSelect={sim.actions.setField} center={options.farm.center!}
       insets={desktop ? DESKTOP_INSETS : STACKED_INSETS} />
   );
 

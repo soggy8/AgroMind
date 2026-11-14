@@ -1,61 +1,53 @@
-"""Saved simulation runs.
-
-A JSON file per run under backend/var/simulator_runs/<farm_id>/. Swap for a table in
-shared/db when the team's PostgreSQL setup exists; the four functions are the interface.
-"""
+"""Saved simulation runs, in the shared database (table `simulation_runs`)."""
 from __future__ import annotations
 
-import json
-import os
-import uuid
-from datetime import datetime, timezone
-from pathlib import Path
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from .models import SimulationRun
 from .schemas import SavedRun, SavedRunSummary, SimulationRequest, SimulationResult
 
-ROOT = Path(os.environ.get("AGROMIND_SIM_STORE", Path(__file__).resolve().parents[3] / "var" / "simulator_runs"))
+
+def _summary(row: SimulationRun) -> SavedRunSummary:
+    return SavedRunSummary(id=row.id, name=row.name, created_at=row.created_at, scenario=row.scenario,
+                           rotation_names=row.rotation_names, recommended_rotation=row.recommended_rotation)
 
 
-def _dir(farm_id: str) -> Path:
-    if not farm_id.replace("-", "").replace("_", "").isalnum():
-        raise ValueError("invalid farm id")
-    return ROOT / farm_id
+def save(session: Session, farm_id: str, name: str, request: SimulationRequest, result: SimulationResult) -> SavedRun:
+    best = next(r.name for r in result.rotations if r.rotation_id == result.recommendation.rotation_id)
+    row = SimulationRun(farm_id=farm_id, field_id=request.field_id, name=name,
+                        scenario=request.scenario.model_dump(), rotation_names=[r.name for r in request.rotations],
+                        recommended_rotation=best, model_version=result.model_version,
+                        request=request.model_dump(mode="json", by_alias=True),
+                        result=result.model_dump(mode="json", by_alias=True))
+    session.add(row)
+    session.commit()
+    return SavedRun(**_summary(row).model_dump(), request=request, result=result)
 
 
-def save(farm_id: str, name: str, request: SimulationRequest, result: SimulationResult) -> SavedRun:
-    run = SavedRun(
-        id=uuid.uuid4().hex[:12], name=name, created_at=datetime.now(timezone.utc), scenario=request.scenario,
-        rotation_names=[r.name for r in request.rotations],
-        recommended_rotation=next(r.name for r in result.rotations if r.rotation_id == result.recommendation.rotation_id),
-        request=request, result=result,
-    )
-    d = _dir(farm_id)
-    d.mkdir(parents=True, exist_ok=True)
-    (d / f"{run.id}.json").write_text(run.model_dump_json(by_alias=True))
-    return run
+def list_runs(session: Session, farm_id: str) -> list[SavedRunSummary]:
+    rows = session.scalars(select(SimulationRun).where(SimulationRun.farm_id == farm_id)
+                           .order_by(SimulationRun.created_at.desc()))
+    return [_summary(r) for r in rows]
 
 
-def list_runs(farm_id: str) -> list[SavedRunSummary]:
-    d = _dir(farm_id)
-    if not d.exists():
-        return []
-    runs = []
-    for p in d.glob("*.json"):
-        data = json.loads(p.read_text())
-        runs.append(SavedRunSummary.model_validate({k: data[k] for k in SavedRunSummary.model_fields}))
-    return sorted(runs, key=lambda r: r.created_at, reverse=True)
+def _row(session: Session, farm_id: str, run_id: str) -> SimulationRun | None:
+    row = session.get(SimulationRun, run_id)
+    return row if row is not None and row.farm_id == farm_id else None
 
 
-def get(farm_id: str, run_id: str) -> SavedRun | None:
-    p = _dir(farm_id) / f"{run_id}.json"
-    if not run_id.isalnum() or not p.exists():
+def get(session: Session, farm_id: str, run_id: str) -> SavedRun | None:
+    row = _row(session, farm_id, run_id)
+    if row is None:
         return None
-    return SavedRun.model_validate_json(p.read_text())
+    return SavedRun(**_summary(row).model_dump(), request=SimulationRequest.model_validate(row.request),
+                    result=SimulationResult.model_validate(row.result))
 
 
-def delete(farm_id: str, run_id: str) -> bool:
-    p = _dir(farm_id) / f"{run_id}.json"
-    if not run_id.isalnum() or not p.exists():
+def delete(session: Session, farm_id: str, run_id: str) -> bool:
+    row = _row(session, farm_id, run_id)
+    if row is None:
         return False
-    p.unlink()
+    session.delete(row)
+    session.commit()
     return True

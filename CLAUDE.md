@@ -33,8 +33,10 @@ NASA Space Apps project: a farm digital twin with a crop-rotation simulator. Thr
   (`docs/modules/simulator_calibration.md`). Don't present t/ha or absolute yield as a
   prediction; lead with change versus today's climate. Rerun the calibration after changing
   anything in `engine/` or `parameters.py`.
-- Field data, weather and saved runs go through `ports.py` and `store.py` only.
-- Checks: `cd backend && pytest tests/simulator`; `cd frontend && npm run build`.
+- Field data and weather go through `ports.py` only (CropTwin via `croptwin.service`).
+- Checks: `cd backend && .venv/bin/python -m pytest`; `cd frontend && npm run build`.
+- Database changes need an Alembic migration; never run `alembic downgrade` on a shared database
+  without checking `alembic current` first.
 
 ## Commits
 

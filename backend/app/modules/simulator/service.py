@@ -4,6 +4,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 import numpy as np
+from sqlalchemy.orm import Session
 
 from . import advisor, ports, ranking, rotations, scenarios, store
 from .economics import costs, revenue
@@ -23,17 +24,17 @@ InvalidRotation = rotations.InvalidRotation
 
 # ---------- options ----------
 
-def get_options(farm_id: str) -> SimulatorOptions:
-    farm = ports.get_farm(farm_id)
-    soil = ports.load_soil()
-    climate, _ = ports.load_climate(*farm.center)
+def get_options(session: Session, farm_id: str) -> SimulatorOptions:
+    farm = ports.get_farm(session, farm_id)
+    calibrated = farm.center is not None and ports.water_storage_scale(*farm.center) != 1.0
     return SimulatorOptions(
         farm=FarmInfo(id=farm.id, name=farm.name, region=farm.region, center=farm.center),
         fields=[FieldOption(id=f.id, name=f.name, crop_id=f.crop_id, area_ha=f.area_ha, boundary=list(f.boundary),
-                            soil=soil.description, irrigation_available=f.irrigation_available)
+                            soil=f.soil.description, irrigation_available=f.irrigation_available)
                 for f in farm.fields],
-        weather_source=climate.source,
-        calibration_note="Calibrated against USDA NASS Story County maize yields, 2001-2025.",
+        weather_source=f"NASA POWER daily (MERRA-2, CERES), {ports.FIRST_YEAR}-{ports.LAST_YEAR}",
+        calibration_note=("Calibrated against USDA NASS Story County maize yields, 2001-2025." if calibrated
+                          else "Outside the calibrated area: results are uncalibrated."),
         crops=[CropOption(id=c.id, name=c.name, family=c.family, season=rotations.season_label(c.id),  # type: ignore[arg-type]
                           notes=None if c.typical_yield_t_ha else "Relative yield only, no economics")
                for c in CROPS.values()],
@@ -68,9 +69,9 @@ def _typical_factors(field: FieldSnapshot, crop_ids: tuple[str, ...]) -> dict[st
 
 # ---------- the run ----------
 
-def run_simulation(farm_id: str, req: SimulationRequest) -> SimulationResult:
-    farm = ports.get_farm(farm_id)
-    field = ports.load_field(farm_id, req.field_id)
+def run_simulation(session: Session, farm_id: str, req: SimulationRequest) -> SimulationResult:
+    farm = ports.get_farm(session, farm_id)
+    field = ports.load_field(session, farm_id, req.field_id)
     climate, data_note = ports.load_climate(field.latitude, field.longitude)
     for rot in req.rotations:
         rotations.validate(rot.crops)
@@ -236,24 +237,24 @@ def _assumptions(field: FieldSnapshot, crop_ids: tuple[str, ...], req: Simulatio
 
 # ---------- saved runs and advisor ----------
 
-def save_run(farm_id: str, name: str, request: SimulationRequest) -> SavedRun:
-    return store.save(farm_id, name, request, run_simulation(farm_id, request))
+def save_run(session: Session, farm_id: str, name: str, request: SimulationRequest) -> SavedRun:
+    return store.save(session, farm_id, name, request, run_simulation(session, farm_id, request))
 
 
-def list_runs(farm_id: str) -> list[SavedRunSummary]:
-    ports.get_farm(farm_id)
-    return store.list_runs(farm_id)
+def list_runs(session: Session, farm_id: str) -> list[SavedRunSummary]:
+    ports.get_farm(session, farm_id)
+    return store.list_runs(session, farm_id)
 
 
-def get_run(farm_id: str, run_id: str) -> SavedRun:
-    run = store.get(farm_id, run_id)
+def get_run(session: Session, farm_id: str, run_id: str) -> SavedRun:
+    run = store.get(session, farm_id, run_id)
     if run is None:
         raise NotFound(f"Unknown run '{run_id}'")
     return run
 
 
-def delete_run(farm_id: str, run_id: str) -> None:
-    if not store.delete(farm_id, run_id):
+def delete_run(session: Session, farm_id: str, run_id: str) -> None:
+    if not store.delete(session, farm_id, run_id):
         raise NotFound(f"Unknown run '{run_id}'")
 
 

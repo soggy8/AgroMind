@@ -1,25 +1,28 @@
-"""The simulator's only door to the outside: field data and weather.
+"""The simulator's only door to the outside: farm and field data, soil, and weather.
 
-CropTwin (`croptwin.service`) and the shared NASA POWER connector are not built yet. Until they
-are, this file serves a demo farm and reads committed sample files. Swap the bodies of
-`list_fields`, `load_field` and `load_climate` when those modules exist; nothing else changes.
+Farm, fields, soil layers and priorities come from CropTwin (`croptwin.service`), with the
+caller's database session. Weather still comes from a committed NASA POWER sample (or a live,
+cached POWER request) until the shared connector in shared/connectors/nasa_power.py exists:
+swap the body of `load_climate` then; nothing else changes.
 """
 from __future__ import annotations
 
 import csv
 import json
 import logging
-import math
 from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
+from sqlalchemy.orm import Session
+
+from app.modules.croptwin import service as croptwin
 
 from .engine import soil_water
-from .parameters import CENTRAL_IOWA_WATER_STORAGE_SCALE, DEFAULT_WATER_STORAGE_SCALE
-from .engine.types import Climate, FieldSnapshot
+from .engine.types import Climate, FieldSnapshot, SoilProfile
+from .parameters import CENTRAL_IOWA_WATER_STORAGE_SCALE, DEFAULT_SOIL, DEFAULT_WATER_STORAGE_SCALE
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +36,7 @@ YIELD_SAMPLE = SAMPLES / "nass_story_county_yields.csv"
 POWER_URL = "https://power.larc.nasa.gov/api/temporal/daily/point"
 POWER_PARAMS = ("T2M_MAX", "T2M_MIN", "PRECTOTCORR", "ALLSKY_SFC_SW_DWN", "RH2M", "WS2M")
 FIRST_YEAR, LAST_YEAR = 2001, 2025
+ROOT_ZONE_CM = 100
 
 
 class NotFound(LookupError):
@@ -43,97 +47,104 @@ class WeatherUnavailable(RuntimeError):
     pass
 
 
-# ---------- farm and fields (stand-in for CropTwin) ----------
+# ---------- farm and fields (CropTwin) ----------
 
 @dataclass(frozen=True)
-class DemoField:
+class FieldView:
     id: str
     name: str
-    crop_id: str
+    crop_id: str | None
     area_ha: float
-    boundary: tuple[tuple[float, float], ...]  # (lat, lon) ring
-    irrigation_available: bool = False
+    boundary: tuple[tuple[float, float], ...]  # (lat, lon) ring for the map
+    irrigation_available: bool
+    soil: SoilProfile
 
 
 @dataclass(frozen=True)
-class DemoFarm:
+class FarmView:
     id: str
     name: str
-    region: str
-    center: tuple[float, float]
-    fields: tuple[DemoField, ...]
+    region: str | None
+    center: tuple[float, float] | None
     priorities: dict
+    fields: tuple[FieldView, ...]
 
 
-def _rect(lat0: float, lon0: float, lat1: float, lon1: float) -> tuple[tuple[float, float], ...]:
-    return ((lat0, lon0), (lat0, lon1), (lat1, lon1), (lat1, lon0))
+def _soil_from_layers(layers, texture: str | None) -> SoilProfile:
+    """Root-zone soil: measured layers first, then the farmer's texture class, then an assumed loam.
+
+    Each layer stands for the depth from the previous layer's bottom (or 0) to its own bottom, so
+    gaps between sampled depths (SoilGrids skips 5-30 cm in our sample) belong to the layer below.
+    """
+    usable = sorted((l for l in layers if l.sand_pct is not None and l.clay_pct is not None),
+                    key=lambda l: l.depth_bottom_cm)
+    weighted, prev = [], 0
+    for l in usable:
+        top, bottom = prev, min(l.depth_bottom_cm, ROOT_ZONE_CM)
+        if bottom > top:
+            weighted.append((bottom - top, l))
+        prev = max(prev, l.depth_bottom_cm)
+    if weighted:
+        total = sum(w for w, _ in weighted)
+        avg = lambda attr: sum(w * (getattr(l, attr) or 0.0) for w, l in weighted) / total
+        origin = "SoilGrids" if all("SoilGrids" in l.source for _, l in weighted) else "measured layers"
+        return soil_water.from_composition(avg("sand_pct"), avg("clay_pct"), avg("soc_g_kg"), origin)
+    if texture:
+        return soil_water.from_texture(texture)
+    p = soil_water.from_texture(DEFAULT_SOIL)
+    return SoilProfile(p.theta_fc, p.theta_wp, "Loam (assumed: no soil data)", p.source + "; assumed")
 
 
-def _area_ha(ring) -> float:
-    lat_c = sum(p[0] for p in ring) / len(ring)
-    xy = [(p[1] * 111_320 * math.cos(math.radians(lat_c)), p[0] * 110_574) for p in ring]
-    a = sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(xy, xy[1:] + xy[:1]))
-    return abs(a) / 2 / 10_000
+def _field_view(f) -> FieldView:
+    ring = tuple((lat, lon) for lon, lat in f.boundary.coordinates[0])
+    if len(ring) > 1 and ring[0] == ring[-1]:
+        ring = ring[:-1]
+    return FieldView(id=f.id, name=f.name, crop_id=f.current_crop_id, area_ha=round(f.area_ha, 1), boundary=ring,
+                     irrigation_available=f.irrigation_available, soil=_soil_from_layers(f.soil_layers, f.soil_texture))
 
 
-# Rectangles over farmland in the sections north of the town; areas are computed from them.
-_NORTH = _rect(42.03673, -93.46250, 42.04167, -93.45384)
-_CREEK = _rect(42.03768, -93.45320, 42.04151, -93.44636)
-_WEST = _rect(42.03720, -93.47104, 42.04151, -93.46310)
-
-DEMO_FARM = DemoFarm(
-    id="demo",
-    name="Demo Farm",
-    region="Story County, Iowa",
-    center=(42.0392, -93.4587),
-    fields=(
-        DemoField("north", "North Field", "maize", round(_area_ha(_NORTH)), _NORTH),
-        DemoField("creek", "Creek Field", "soybean", round(_area_ha(_CREEK)), _CREEK),
-        DemoField("west", "West Field", "oats", round(_area_ha(_WEST)), _WEST),
-    ),
-    priorities={"yield": 1.0, "water": 1.0, "risk": 1.0, "soil": 1.0, "margin": 0.0},
-)
+def get_farm(session: Session, farm_id: str) -> FarmView:
+    try:
+        farm = croptwin.get_farm(session, farm_id)
+    except croptwin.NotFound as e:
+        raise NotFound(str(e)) from e
+    fields = tuple(_field_view(f) for f in farm.fields)
+    center = None
+    if farm.fields:
+        center = (sum(f.centroid_lat for f in farm.fields) / len(farm.fields),
+                  sum(f.centroid_lon for f in farm.fields) / len(farm.fields))
+    return FarmView(id=farm.id, name=farm.name, region=farm.region, center=center,
+                    priorities=farm.priorities.model_dump(by_alias=True), fields=fields)
 
 
-def get_farm(farm_id: str) -> DemoFarm:
-    if farm_id != DEMO_FARM.id:
-        raise NotFound(f"Unknown farm '{farm_id}'")
-    return DEMO_FARM
+def load_field(session: Session, farm_id: str, field_id: str) -> FieldSnapshot:
+    try:
+        f = croptwin.get_field(session, farm_id, field_id)
+    except croptwin.NotFound as e:
+        raise NotFound(str(e)) from e
+    lat, lon = f.centroid_lat, f.centroid_lon
+    return FieldSnapshot(field_id=f.id, name=f.name, latitude=lat, longitude=lon, area_ha=f.area_ha,
+                         soil=_soil_from_layers(f.soil_layers, f.soil_texture), previous_crop_id=f.current_crop_id,
+                         irrigation_available=f.irrigation_available,
+                         water_storage_scale=water_storage_scale(lat, lon), calibrated=_same_power_cell(lat, lon))
 
 
-def list_fields(farm_id: str) -> tuple[DemoField, ...]:
-    return get_farm(farm_id).fields
-
-
-def load_field(farm_id: str, field_id: str) -> FieldSnapshot:
-    farm = get_farm(farm_id)
-    for f in farm.fields:
-        if f.id == field_id:
-            lat = sum(p[0] for p in f.boundary) / len(f.boundary)
-            lon = sum(p[1] for p in f.boundary) / len(f.boundary)
-            return FieldSnapshot(field_id=f.id, name=f.name, latitude=lat, longitude=lon, area_ha=f.area_ha,
-                                 soil=load_soil(), previous_crop_id=f.crop_id,
-                                 irrigation_available=f.irrigation_available,
-                                 water_storage_scale=water_storage_scale(lat, lon),
-                                 calibrated=_same_power_cell(lat, lon))
-    raise NotFound(f"Unknown field '{field_id}'")
+@dataclass(frozen=True)
+class _SampleLayer:
+    depth_bottom_cm: int
+    sand_pct: float
+    clay_pct: float
+    soc_g_kg: float
+    source: str = "ISRIC SoilGrids v2.0 sample"
 
 
 @lru_cache(maxsize=1)
-def load_soil():
-    """Root-zone (0-100 cm) composition from the SoilGrids sample, depth-weighted."""
+def load_soil() -> SoilProfile:
+    """The demo farm's soil from the committed SoilGrids sample (used by calibration and tests)."""
     data = json.loads(SOIL_SAMPLE.read_text())
-    weights = {"0-5cm": 5, "30-60cm": 55, "60-100cm": 40}  # 5-30 cm is represented by the 30-60 cm layer
-    total = sum(weights.values())
-    avg = {k: sum(l[k] * weights[l["depth"]] for l in data["layers"]) / total
-           for k in ("sand_pct", "clay_pct", "soc_g_kg")}
-    return soil_water.from_composition(avg["sand_pct"], avg["clay_pct"], avg["soc_g_kg"], "SoilGrids")
-
-
-def soil_summary() -> dict:
-    data = json.loads(SOIL_SAMPLE.read_text())
-    top = data["layers"][0]
-    return {"ph": top["ph"], "soc_g_kg": top["soc_g_kg"], "source": "ISRIC SoilGrids v2.0"}
+    layers = [_SampleLayer(int(l["depth"].split("-")[1].removesuffix("cm")), l["sand_pct"], l["clay_pct"], l["soc_g_kg"])
+              for l in data["layers"]]
+    return _soil_from_layers(layers, None)
 
 
 # ---------- weather (stand-in for shared/connectors/nasa_power.py) ----------

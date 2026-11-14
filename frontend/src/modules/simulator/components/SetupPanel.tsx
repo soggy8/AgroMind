@@ -23,7 +23,7 @@ export function SetupPanel({ options, sim }: { options: SimulatorOptions; sim: S
 
   if (!draft) return null;
   const field = options.fields.find((f) => f.id === draft.fieldId);
-  const cropName = (id: string) => options.crops.find((c) => c.id === id)?.name ?? id;
+  const cropName = (id: string | null) => (id ? options.crops.find((c) => c.id === id)?.name ?? id : null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -42,7 +42,9 @@ export function SetupPanel({ options, sim }: { options: SimulatorOptions; sim: S
                     on ? "border-white/12 bg-glass-sel" : "border-transparent hover:bg-glass-hi"}`}>
                   <span>
                     <span className="block text-[15px] font-bold">{f.name}</span>
-                    <span className="block text-[13px] text-mut">Now {cropName(f.crop_id).toLowerCase()} · {f.area_ha} ha</span>
+                    <span className="block text-[13px] text-mut">
+                      {f.crop_id ? `Now ${cropName(f.crop_id)!.toLowerCase()}` : "No current crop"} · {f.area_ha} ha
+                    </span>
                   </span>
                   {on && <span className="text-[12px] font-semibold text-mut">{f.soil.replace(" (SoilGrids)", "")}</span>}
                 </button>
@@ -51,7 +53,10 @@ export function SetupPanel({ options, sim }: { options: SimulatorOptions; sim: S
           </div>
           {field && (
             <p className="mt-2 text-[12px] leading-snug text-mut">
-              Soil: {field.soil}. Rotations start after this season's {cropName(field.crop_id).toLowerCase()}.
+              Soil: {field.soil}.{" "}
+              {field.crop_id
+                ? `Rotations start after this season's ${cropName(field.crop_id)!.toLowerCase()}.`
+                : "No current crop recorded, so the first season has no rotation effect."}
             </p>
           )}
         </section>

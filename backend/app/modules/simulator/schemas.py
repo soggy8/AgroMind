@@ -203,7 +203,7 @@ class ScenarioPreset(BaseModel):
 class FieldOption(BaseModel):
     id: str
     name: str
-    crop_id: str                 # current crop
+    crop_id: str | None          # current crop, if CropTwin knows it
     area_ha: float
     boundary: list[tuple[float, float]]  # (lat, lon) ring
     soil: str
@@ -213,8 +213,8 @@ class FieldOption(BaseModel):
 class FarmInfo(BaseModel):
     id: str
     name: str
-    region: str
-    center: tuple[float, float]
+    region: str | None
+    center: tuple[float, float] | None  # None when the farm has no fields yet
 
 
 class SimulatorOptions(BaseModel):

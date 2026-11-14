@@ -19,7 +19,10 @@ def soil():
     return ports.load_soil()
 
 
-@pytest.fixture(autouse=True)
-def _isolated_store(tmp_path, monkeypatch):
-    from app.modules.simulator import store
-    monkeypatch.setattr(store, "ROOT", tmp_path / "runs")
+@pytest.fixture
+def api(client, db_session):
+    """API client on a fresh in-memory database holding CropTwin's demo farm."""
+    from app.modules.croptwin.seed import seed_demo_farm
+
+    seed_demo_farm(db_session)
+    return client
