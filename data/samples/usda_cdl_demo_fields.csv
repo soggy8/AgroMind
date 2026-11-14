@@ -1,0 +1,47 @@
+# Source: USDA NASS Cropland Data Layer (30 m), via Microsoft Planetary Computer
+# Collection: usda-cdl, asset cropland, 2008 to 2021 (the years the collection holds). Retrieved 2026-11-14.
+# Method: the same five points per field; the most common class code is the field's crop for the year.
+# Class names come from the collection's classification:classes.
+field_id,year,code,crop
+north,2008,1,Corn
+north,2009,5,Soybeans
+north,2010,1,Corn
+north,2011,1,Corn
+north,2012,5,Soybeans
+north,2013,1,Corn
+north,2014,5,Soybeans
+north,2015,5,Soybeans
+north,2016,5,Soybeans
+north,2017,1,Corn
+north,2018,5,Soybeans
+north,2019,1,Corn
+north,2020,5,Soybeans
+north,2021,1,Corn
+creek,2008,1,Corn
+creek,2009,5,Soybeans
+creek,2010,1,Corn
+creek,2011,5,Soybeans
+creek,2012,1,Corn
+creek,2013,5,Soybeans
+creek,2014,1,Corn
+creek,2015,5,Soybeans
+creek,2016,1,Corn
+creek,2017,5,Soybeans
+creek,2018,1,Corn
+creek,2019,5,Soybeans
+creek,2020,1,Corn
+creek,2021,5,Soybeans
+west,2008,1,Corn
+west,2009,5,Soybeans
+west,2010,176,Grassland/Pasture
+west,2011,176,Grassland/Pasture
+west,2012,1,Corn
+west,2013,5,Soybeans
+west,2014,1,Corn
+west,2015,5,Soybeans
+west,2016,1,Corn
+west,2017,176,Grassland/Pasture
+west,2018,1,Corn
+west,2019,176,Grassland/Pasture
+west,2020,1,Corn
+west,2021,176,Grassland/Pasture

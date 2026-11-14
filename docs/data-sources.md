@@ -27,3 +27,13 @@ Earthdata Login is required for SMAP, MODIS, Landsat, GPM (see `.env.example`).
 
 The NASS Quick Stats API needs a free key; the county yields above were transcribed from ISU's
 published tables instead.
+
+## Used by CropDoctor (verified 2026-11-14)
+
+| Source | Use | Where |
+|---|---|---|
+| MODIS MOD13Q1 and MYD13Q1 v061, 16-day NDVI at 250 m, via Microsoft Planetary Computer | Field greenness 2000-2026: five points per demo field, good and marginal pixels only | `data/samples/modis_ndvi_demo_fields.csv`; built by `cropdoctor/fetch_samples.py` |
+| USDA NASS Cropland Data Layer 2008-2021, via Microsoft Planetary Computer | Crop grown in each demo field each year, to check the greenness curve is a crop's | `data/samples/usda_cdl_demo_fields.csv` |
+| NASA POWER daily point API, community `AG` | Weather for the same cell as the Simulator sample, 2026 to date (2001-2025 is the Simulator's file) | `data/samples/power_daily_story_county_ia_2026.csv` |
+
+MODIS, Landsat and the crop map need no Earthdata login when read through Planetary Computer.
