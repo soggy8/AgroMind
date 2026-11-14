@@ -360,6 +360,8 @@ would trigger a refresh. Rerun `fetch_samples` or patch the fetchers in them.
 - SMAP soil moisture (needs an Earthdata login).
 - Connectors moving from CropDoctor's `ports.py` to `shared/connectors`.
 - Greenness for farms other than the demo farm.
+- A working farm switcher (shared top bar). Until then another farm opens with
+  `/?farm=<id>#/command-center`.
 - `useMedia` and ET0 copies moving to `shared/`.
 - On a phone the map shows no greenness values; they are in the Fields tab.
 
