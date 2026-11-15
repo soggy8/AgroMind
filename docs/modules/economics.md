@@ -3,8 +3,8 @@
 Module 5.5 of `AgroMind_Project_Plan.md`, "Optional Economic Intelligence", turned into a separate
 backend module that puts the Simulator's results into money.
 
-**Status (2026-11-15): built (backend only).** Owner: Kiril. The module has 46 tests and the full
-backend suite passes (109 tests). The screens come later, inside andrej's central dashboard, which
+**Status (2026-11-15): built (backend only).** Owner: Kiril. The module has 68 tests and the full
+backend suite passes (131 tests). The screens come later, inside andrej's central dashboard, which
 calls this module's HTTP API. See "Run it" below.
 
 ## Run it
@@ -22,11 +22,13 @@ curl -X POST http://localhost:8000/api/farms/demo/economics/report \
   -H 'Content-Type: application/json' -d '{"field_id":"north"}'
 ```
 
-Both return 200 and JSON. Tests: `.venv/bin/python -m pytest tests/economics` (46 tests).
+Both return 200 and JSON. Tests: `.venv/bin/python -m pytest tests/economics` (68 tests).
 
-With the default grid on the demo farm, after the Simulator has warmed up, a report takes about
-2.1 s (limit 7 s, set by Kiril). It makes 6 Simulator runs, because identical runs are reused
-within one request (a grid row with no warming and no rain change is the same run as "today").
+Every report must take at most 7 s (Kiril). With all defaults on the demo farm, after the Simulator
+has warmed up (its weather and caches loaded by a first request), a report takes about 1.4 s and
+makes 5 Simulator runs: the default scenario is today's climate, so one run serves today, the
+scenario, the other heat response and grid row 0. The slowest request measured takes about 5.4 s
+(section 11).
 
 Read with: `README.md` (module rules), `DESIGN.md` section 8 (labels), `docs/modules/simulator.md`
 (the model this module sits on), `docs/modules/simulator_calibration.md` (how far the numbers can be
@@ -118,7 +120,7 @@ andrej's dashboard decides the real look.
     Cash cushion for the worst run of seasons
  3  WHO EARNS MOST? · warming (rows) vs price change (columns)  [Modelled]
     each cell: the rotation with the highest margin, or "too close"
-    "Corn–Soy stops earning most between +1 °C and +2 °C at today's prices."
+    "Corn–Soy stops earning most between +1 °C and +2 °C with 7% more rain at today's prices."
  4  YOUR NUMBERS · default (source) and yours ("Your number")   [Scenario]
     Land: rent $274/ac (ISU 2026) or own · prices (USDA WASDE) · costs (ISU 2026)
 ```
@@ -130,12 +132,17 @@ andrej's dashboard decides the real look.
 Each report calls `simulator.service.run_simulation` with the same field, rotations, irrigation,
 `years` and cover-crop settings, and `price_change_pct = 0` (this module applies prices itself):
 
-| Run | Climate | Heat response | Used by |
-|---|---|---|---|
-| today | `temp_delta_c 0`, `rain_change_pct 0`, no projection | requested | block 1 |
-| scenario | as requested | requested | blocks 1, 2 |
-| other | as requested | the other one | block 1 ("this county's history" line) |
-| grid row per warming level | uniform `temp_delta_c = w`, rain change below, no projection | requested | block 3 |
+| Run | Climate | Heat response | Rotations | Used by |
+|---|---|---|---|---|
+| today | `temp_delta_c 0`, `rain_change_pct 0`, no projection | requested | yours; all priced when today is also a grid row | block 1 |
+| scenario | as requested | requested | all priced | blocks 1, 2 |
+| other | as requested | the other one | yours | block 1 ("this county's history" line) |
+| grid row per warming level | uniform `temp_delta_c = w`, rain change below, no projection | requested | all priced | block 3 |
+
+A report makes one Simulator run per distinct scenario. A run already made for the same scenario
+is reused when it holds every rotation asked for: the Simulator simulates each rotation on its own,
+so a rotation's result doesn't depend on the others. With no warming (`temp_delta_c 0`, no
+projection) the heat response changes nothing, so both heat responses count as one scenario.
 
 Grid rows use the scenario's rain change: `rain_change_pct` for slider scenarios, the projection's
 May-Sep median rain change (`ProjectionInfo.rain_change_pct["median"]`) for NASA projections. The
@@ -173,12 +180,14 @@ Stats are p10 / p50 / p90 across tracks. With default numbers this must equal th
 **Climate bill** (for "yours", the first rotation):
 - `today` and `scenario`: stats of `annual` in each run.
 - `change`: stats of `scenario.annual[t] - today.annual[t]`, paired by track (same weather years).
-- `change_whole_field`: `change` x the field's `area_ha`.
+- `change_whole_field`: stats of the per-track change x the field's `area_ha`, rounded after
+  multiplying.
 - `other_heat_response_change`: p50 of the same paired change using the "other" run.
 - `best_alternative`: the priced rotation other than yours with the highest scenario p50.
   `wins_back` = p50 of `alt.annual[t] - yours.annual[t]` in the scenario. `wins_back_share` =
   `wins_back / -change.p50`, only when `change.p50 < 0` and `wins_back > 0`. A share above 1 means
   it "more than makes up for it". None when no other priced rotation exists.
+- Sources: price, yield and cost of yours' crops and the best alternative's crops, and rent.
 
 **Bad-year money** (each priced rotation, scenario run):
 - `losing_season_share`: share of all (season, track) margins below 0.
@@ -188,31 +197,51 @@ Stats are p10 / p50 / p90 across tracks. With default numbers this must equal th
   the start so the running total never goes negative. Report the worst track and the p50.
 
 **Who earns most** (needs two or more priced rotations, otherwise `null` with a note):
-- Rows: `warming_c` (default `[0, 1, 2, 3, 4]`). Columns: `price_change_pct` (default
-  `[-30, -15, 0, 15, 30]`). Prices change by arithmetic, so only rows need runs.
+- Rows: `warming_c` (default `[0, 1, 2, 3, 4]`, at most 5, one Simulator run each). Columns:
+  `price_change_pct` (default `[-30, -15, 0, 15, 30]`). Prices change by arithmetic, so only rows
+  need runs.
 - Cell: each rotation's `annual` p50. The winner has the highest p50. If the top two are within
   `NEAR_TIE_USD_HA`, the cell is a near tie with no winner.
 - `your_cell`: the row nearest the scenario's warming (`temp_delta_c`, or the projection's May-Sep
   median temperature change) and the column nearest the requested `price_change_pct`. `exact` is
-  false when either is not on the grid.
-- Switch sentence (rule-generated): moving down the price-0 column (or the nearest column), the first
-  row where yours stops winning gives "stops earning most between +a and +b °C at today's prices".
-  Moving left from 0% along row 0, the first column where yours stops winning gives "or when prices
-  fall between x% and y%". Other cases: "earns most in every cell", "even in today's climate B
-  earns more". Near ties never count as a switch.
+  false when either is not on the grid, and always for a projection (a grid row only approximates it).
+- Switch sentence (rule-generated). The anchor is the row nearest 0 °C and the column nearest 0%.
+  - Moving down the anchor column, the switch is the last row where yours wins outright and the
+    first row where another rotation wins: "stops earning most between +1 °C and +2 °C". Near ties
+    are neither: when tied rows lie between the two, the sentence names them, e.g. "is too close to
+    call from +2 °C and stops earning most by +4 °C".
+  - Moving left along the anchor row (prices falling), the same rule gives "when prices fall between
+    15% and 30%", or "is too close to call when prices fall 15% and stops earning most when they
+    fall 30%".
+  - Anchor wording: "today's climate" only when the anchor row has no warming and the grid rows no
+    rain change; otherwise it is named, e.g. "today's temperatures with 20% less rain" or "a climate
+    +0.5 °C from today". "Today's prices" only when the anchor column is 0%; otherwise "prices 15%
+    lower". With `price_crop` the crop is named: "today's soybean prices".
+  - Other cases: "earns most everywhere on this grid"; "earns most or is too close to call
+    everywhere on this grid" (only wins and ties); "earns most in today's climate at today's prices;
+    other rotations win elsewhere on the grid"; "even in today's climate at today's prices, B earns
+    more"; a near tie at the anchor says so.
+- Sources (all three blocks): price, yield and cost of the block's crops and rent; the cover-crop
+  cost when a rotation in the block has a cover crop; the irrigation cost and the per-year irrigation
+  approximation (section 6.6) when the scenario irrigates; the grid adds the near-tie value.
 
 ### 6.5 Sentences
 
 Rule-generated in `sentences.py`, one per block, from the numbers in that report only. They say
 "about" and stay cautious, follow `units` ($/ha or $/ac), and the report adds one fixed caveat:
 compare rotations rather than reading single numbers, because the model's year-to-year skill is weak.
-When the Simulator says the field is not calibrated, the report adds a note that the figures are
-rough.
+When the Simulator says the field is not calibrated, the report carries one note saying so: the
+Simulator's own, or this module's "treat the money figures as rough" when the Simulator's note
+doesn't say it.
+
+Wording rules: a change that shows as $0 in the requested units reads "about the same"; with no
+other priced rotation the climate bill says "There's no other priced rotation to compare."; bad
+years say "every simulated season" when every season loses, and at most "9 of every 10" otherwise.
 
 ### 6.6 Irrigation
 
 The Simulator's public result gives each season's irrigation as p10 / p50 / p90, not per track, so
-this module uses the season's p50 for every track. Rain-fed runs (the Iowa default) are exact.
+this module uses the season's p50 for every track. Rain-fed runs (the Iowa default) are not affected.
 Irrigated runs add an assumption saying so. Exact per-track irrigation needs one field from andrej
 (section 13).
 
@@ -236,8 +265,10 @@ Router prefix `/api/farms/{farm_id}/economics`, tag `economics`.
 - `price_change_pct` (−40 to 40, default 0) and optional `price_crop`.
 - `your_numbers` (optional): `land` (`rent` | `own`), `rent_usd_ha`, `prices_usd_t` and
   `costs_before_rent_usd_ha` keyed by crop id, `irrigation_usd_per_mm_ha`, `cover_crop_usd_ha`.
-  Anything left out uses the default.
-- `grid` (optional): `warming_c` (2 to 7 unique values in −1 to 5), `price_change_pct` (2 to 9 unique
+  Anything left out uses the default. Bounds: price above 0 and at most 10,000 USD/t; cost before
+  rent and rent 0 to 20,000 USD/ha; irrigation 0 to 100 USD/mm/ha; cover crop 0 to 5,000 USD/ha.
+  Outside them the request is a 422.
+- `grid` (optional): `warming_c` (2 to 5 unique values in −1 to 5), `price_change_pct` (2 to 9 unique
   values in −40 to 40).
 - `units`: `metric` | `us`.
 
@@ -248,9 +279,11 @@ kind and source), `excluded_rotations` (id and reason), `assumptions`, `notes`, 
 `ensemble_size`, `ensemble_start_years`, `data_note` and `simulator_model_version`. Each block carries
 `kind`, `sources` and `sentence`.
 
-Errors: unknown farm or field → 404. Yours has an unpriced crop (winter wheat, sunflower), or the
-Simulator rejects a rotation or projection → 422 with a plain message. Weather unavailable → 503,
-with the Simulator's wording.
+Errors: unknown farm or field → 404. A crop id that isn't in the Simulator's catalogue (in any
+rotation, your numbers or `price_crop`) → 422 "'banana' isn't a known crop". Yours has a known crop
+without Iowa price and cost data (winter wheat, sunflower), or the Simulator rejects a rotation or
+projection → 422 with a plain message; another rotation with such a crop is left out and listed in
+`excluded_rotations`. Weather unavailable → 503, with the Simulator's wording.
 
 ## 8. Module layout
 
@@ -270,8 +303,9 @@ frontend/src/modules/economics/types.ts
 
 `ports.py` turns Simulator results into plain dataclasses (per rotation: season crops, track
 relative yields, season irrigation p50; plus field name, area, current crop, calibrated flag,
-ensemble years, data note, model version, projection info) and turns the Simulator's errors into the
-module's own `NotFound`, `InvalidRequest` and `WeatherUnavailable`. Tests can swap it for a fake.
+ensemble years, data note, model version, projection info, and the crop catalogue's ids) and turns
+the Simulator's errors into the module's own `NotFound`, `InvalidRequest` and `WeatherUnavailable`.
+Tests can swap it for a fake.
 
 ## 9. Parameters (copied from the Simulator with the same sources)
 
@@ -309,10 +343,15 @@ total cost.
 
 - `test_money.py` (pure): margins, maize-after-maize cost, rent vs own, cover-crop cost, one-crop price
   shift, paired change, cash cushion on a hand-made series, losing shares, grid winner and near tie,
-  switch-point cases.
+  switch-point cases (counted from the last outright win, ties between, ties only).
+- `test_sentences.py` (pure): every sentence shape, including the anchor wording and `price_crop`.
+- `test_schemas.py`: defaults, grid limits (at most 5 warming rows) and the bounds on your numbers.
 - `test_service.py` (fake port): block assembly, best alternative and win-back share, excluded
-  unpriced rotations, 422 when yours is unpriced, defaulted rotations with `yours_assumed`, the
-  projection's rain change used for grid rows, the irrigation assumption added only when irrigated.
+  unpriced rotations, 422 when yours is unpriced or a crop isn't known, defaulted rotations with
+  `yours_assumed`, the projection's rain change used for grid rows, the irrigation assumption added
+  only when irrigated, each block's sources, exact sentences (rain-changing anchor, ties only, ties
+  before the switch, `price_crop`, a single priced rotation), and which runs are made (today and the
+  other heat response for yours only, reuse of identical runs).
 - `test_api.py` (real Simulator on the seeded demo farm):
   - `/defaults` and `/report` respond.
   - **Consistency**: with default numbers, rain-fed, with and without cover crops, each rotation's
@@ -320,8 +359,25 @@ total cost.
     $3/ha/yr (measured: within $1/ha/yr). The tolerance comes from the Simulator rounding `track_seasons` to 0.001 (up to about
     $1.20/ha a season for maize), plus both sides rounding to whole dollars.
   - Report time with the default grid is printed and must be **at most 7 s** (Kiril, 2026-11-15),
-    measured after the Simulator has warmed up (measured: about 2.1 s). If it's slower, make the report faster (for example by
-    reusing the today run for a grid row with no warming and no rain change); don't shrink the default grid.
+    measured after the Simulator has warmed up (measured: about 1.8 s). If it's slower, make the
+    report faster; don't shrink the default grid.
+- **Every valid request within 7 s** (Kiril). Not an automated test, because the time depends on the
+  machine; measured by hand after the Simulator has warmed up, demo farm, North field, default grid:
+
+  | Request | Simulator runs | Time |
+  |---|---|---|
+  | all defaults (`{"field_id": "north"}`) | 5 | 1.41 s |
+  | 4 priced rotations (maize; maize-soybean; maize-soybean-oats; soybean-maize-oats + rye), `years` 10, +0.5 °C, −10% rain | 8 | 5.20 s |
+  | the same with `projection` `ssp585_2080s` | 8 | 5.21 s |
+  | **worst case:** the same 4-rotation request with `irrigation` `full` | 8 | **5.42 s** |
+
+  Slowest of three runs each, 2026-11-15 (an earlier session gave 5.45 s for the worst case).
+  Limited irrigation, cover crops on every rotation, 6-crop rotations, the local heat response and
+  an off-scenario grid all measured 5.4 to 5.5 s. Almost all the time is in the Simulator (about
+  0.85 s per run of 4 rotations). Before today and the other heat response were run for yours only,
+  the same requests took 6.2 to 6.5 s here, and a 7-row grid 7.8 s (now rejected: at most 5 rows).
+  Another machine measured the 4-rotation request at 7.84 s before that change, about 1.25 times
+  slower than this one; at that ratio the worst case is about 6.8 s, close to the limit.
 - `frontend`: `npm run build` passes with the new `types.ts`.
 
 ## 12. Changes outside the module (tell the team)
@@ -348,7 +404,8 @@ These weren't discussed. They're the writer's calls:
    median rain change.
 3. Near tie at $45/ha/yr, derived from the Simulator's own near-tie rule.
 4. Switch points are reported between grid rows ("between +1 and +2 °C"), not interpolated, to
-   avoid false precision.
+   avoid false precision. They count from the last outright win, so near ties are named, not
+   hidden.
 5. Bad-year money counts seasons, not calendar years, and also reports losing runs out of 25.
 6. Irrigated runs use each season's p50 irrigation for every track (section 6.6).
 7. `/defaults` also exists, so the dashboard can fill the "your numbers" form.
