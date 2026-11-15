@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-Page = Literal["home", "overview", "command-center", "simulator", "farm-profile"]
+Page = Literal["home", "overview", "command-center", "simulator", "economics", "farm-profile"]
 
 
 class Turn(BaseModel):

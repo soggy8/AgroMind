@@ -80,9 +80,9 @@ interface Assistant {
 
 const Ctx = createContext<Assistant | null>(null);
 const PAGE_LABEL: Record<Exclude<AssistantPage, "home">, string> = {
-  overview: tr("Overview"), "command-center": tr("Command Center"), simulator: tr("Simulator"), "farm-profile": tr("Farm profile"),
+  overview: tr("Overview"), "command-center": tr("Command Center"), simulator: tr("Simulator"), economics: tr("Farm money"), "farm-profile": tr("Farm profile"),
 };
-/** Pages that register a PageTarget; others (overview) are only opened. */
+/** Pages that register a PageTarget; others (overview, economics) are only opened. */
 const OPERATED: ReadonlySet<AssistantPage> = new Set<AssistantPage>(["command-center", "simulator", "farm-profile"]);
 const STATE_ACTIONS = new Set(["navigate", "set_date", "set_layer", "select_field", "set_simulation", "run_simulation"]);
 

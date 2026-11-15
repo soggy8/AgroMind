@@ -3,9 +3,9 @@
  * actions documented in agent.py and tools.py: change them together (docs/modules/assistant.md).
  */
 
-export type AssistantPage = "home" | "overview" | "command-center" | "simulator" | "farm-profile";
+export type AssistantPage = "home" | "overview" | "command-center" | "simulator" | "economics" | "farm-profile";
 /** Pages the assistant operates (registers a PageTarget on). */
-export type AppPage = Exclude<AssistantPage, "home" | "overview">;
+export type AppPage = Exclude<AssistantPage, "home" | "overview" | "economics">;
 
 export interface Turn {
   role: "user" | "assistant";

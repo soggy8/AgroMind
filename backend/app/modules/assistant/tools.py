@@ -5,7 +5,7 @@ only material the answer may use). Nothing here writes to the database: farm cha
 farmer confirms on screen, and the browser then saves them through CropTwin's own API.
 
 Actions (the browser contract, see frontend/src/shared/assistant/types.ts):
-  {"type": "navigate", "page": "overview" | "command-center" | "simulator" | "farm-profile"}
+  {"type": "navigate", "page": "overview" | "command-center" | "simulator" | "economics" | "farm-profile"}
   {"type": "set_date", "date": "YYYY-MM-DD"}                 Command Center
   {"type": "set_layer", "layer": "greenness" | "satellite"}  Command Center
   {"type": "select_field", "field_id": str, "field_name": str}   current page
@@ -31,7 +31,7 @@ from .ports import ToolFailed
 from .schemas import PageState
 
 LAYERS = ["greenness", "satellite"]
-PAGES = ["overview", "command-center", "simulator", "farm-profile"]
+PAGES = ["overview", "command-center", "simulator", "economics", "farm-profile"]
 IRRIGATION = ["none", "limited", "full"]
 
 

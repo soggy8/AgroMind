@@ -29,6 +29,7 @@ MAX_TURNS = 6            # earlier chat turns sent to the model
 MAX_PROMPT_FACTS = 40    # most recent facts sent back (older ones stay numbered on screen, unsent)
 
 PAGE_NAMES = {"home": "the landing page", "overview": "the farm overview", "command-center": "the Command Center", "simulator": "the Simulator",
+              "economics": "the farm money page (climate bill, bad-year money, who earns most)",
               "farm-profile": "the farm profile"}
 
 RULES = """You are AgroMind's assistant, built into the AgroMind website, a digital twin of a farm. You operate \
