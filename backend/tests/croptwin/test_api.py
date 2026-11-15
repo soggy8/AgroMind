@@ -45,7 +45,7 @@ def test_farm_and_field_lifecycle(client):
     assert r.json()["area_ha"] == pytest.approx(19.85, rel=0.01)
 
     assert client.get("/api/farms").json() == [{"id": farm["id"], "name": "Test Farm", "region": None,
-                                                "field_count": 1}]
+                                                "field_count": 1, "public": False}]
     assert client.delete(f"/api/farms/{farm['id']}").status_code == 204
     assert client.get(f"/api/farms/{farm['id']}").status_code == 404
 

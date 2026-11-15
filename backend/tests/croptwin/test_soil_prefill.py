@@ -6,6 +6,7 @@ import pytest
 
 from app.modules.croptwin import geometry, soil_source
 from app.modules.croptwin.seed import seed_demo_farm
+from tests.ownership import claim
 from app.modules.simulator import ports
 
 SAMPLE = json.loads(soil_source.SAMPLE.read_text(encoding="utf-8"))
@@ -73,6 +74,7 @@ def test_crossing_boundary_and_unknown_crop_rejected(client):
 def test_field_round_trips_through_simulator_ports(client, db_session):
     """A field drawn and prefilled through CropTwin's API is what the Simulator reads (ports used read-only)."""
     seed_demo_farm(db_session)
+    claim(db_session)
     r = client.post("/api/farms/demo/fields", json={"name": "Drawn Field", "boundary": NEAR,
                                                     "current_crop_id": "soybean", "irrigation_available": True})
     field = r.json()

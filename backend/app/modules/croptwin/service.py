@@ -35,19 +35,27 @@ class Conflict(ValueError):
 
 # ---------- farms ----------
 
-def list_farms(session: Session) -> list[FarmSummary]:
-    return [FarmSummary(id=f.id, name=f.name, region=f.region, field_count=n)
-            for f, n in repository.list_farms(session)]
+def list_farms(session: Session, owner_id: str | None = None) -> list[FarmSummary]:
+    """Public farms plus the farms `owner_id` owns (only public farms when nobody is signed in)."""
+    return [FarmSummary(id=f.id, name=f.name, region=f.region, field_count=n, public=f.public)
+            for f, n in repository.list_farms(session, owner_id)]
+
+
+def farm_owner(session: Session, farm_id: str) -> tuple[bool, str | None]:
+    """(exists, owner_id) for a farm; owner_id None means a public farm. Used by app/access.py."""
+    farm = session.get(Farm, farm_id)
+    return (farm is not None, farm.owner_id if farm else None)
 
 
 def get_farm(session: Session, farm_id: str) -> FarmOut:
     return FarmOut.model_validate(_farm(session, farm_id))
 
 
-def create_farm(session: Session, data: FarmCreate, farm_id: str | None = None) -> FarmOut:
+def create_farm(session: Session, data: FarmCreate, farm_id: str | None = None, owner_id: str | None = None) -> FarmOut:
+    """A new farm. Without `owner_id` it is public and read-only (the seeded demo farm)."""
     farm = Farm(name=data.name, region=data.region, constraints=data.constraints,
                 priorities=data.priorities.model_dump(by_alias=True),
-                location_lat=data.location_lat, location_lon=data.location_lon)
+                location_lat=data.location_lat, location_lon=data.location_lon, owner_id=owner_id)
     if farm_id:
         farm.id = farm_id
     session.add(farm)

@@ -1,5 +1,7 @@
-import { Columns2, FolderOpen, Save, Trash2 } from "lucide-react";
+import { Columns2, FolderOpen, Lock, Save, Trash2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { useAuth } from "../../../app/auth";
+import { useFarmChoice } from "../../../app/farm";
 import { Button } from "../../../shared/components";
 import { useUnits } from "../../../shared/units";
 import { signed } from "../lib/format";
@@ -22,6 +24,10 @@ export function SavedRuns({ runs, error, canSave, defaultName, onSave, onOpen, o
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
+  // The demo farm is read-only (backend app/access.py): runs can be made and compared, not saved.
+  const { farms, selectedId } = useFarmChoice();
+  const auth = useAuth();
+  const readOnly = !!farms?.find((f) => f.id === selectedId)?.public;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -50,6 +56,17 @@ export function SavedRuns({ runs, error, canSave, defaultName, onSave, onOpen, o
   return (
     <section aria-labelledby="saved-h">
       <h3 id="saved-h" className="text-[15px] font-bold">{t("Saved runs")}</h3>
+      {readOnly ? (
+        <div className="mt-2 rounded-chip border border-line px-3 py-2.5 text-[13px] leading-snug">
+          <p className="flex items-center gap-2 font-medium"><Lock size={14} strokeWidth={1.5} className="shrink-0 text-mut" /> {t("The demo farm is read-only")}</p>
+          <p className="mt-1 text-mut">
+            {auth.user ? t("Add a farm of your own in the Farm profile to save runs.") : t("Create a free account and add your farm to save runs.")}
+          </p>
+          {!auth.user && (
+            <Button className="mt-2 max-sm:min-h-11" onClick={() => auth.openAuth({ mode: "signup" })}>{t("Create an account")}</Button>
+          )}
+        </div>
+      ) : <>
       <form onSubmit={submit} className="mt-2 flex gap-2">
         <label className="sr-only" htmlFor="run-name">{t("Name for this run")}</label>
         <input id="run-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={defaultName} maxLength={80}
@@ -60,6 +77,7 @@ export function SavedRuns({ runs, error, canSave, defaultName, onSave, onOpen, o
         </Button>
       </form>
       {!canSave && <p className="mt-1.5 text-[12px] text-mut">{t("Run the simulation first; saving stores the inputs and the result.")}</p>}
+      </>}
       {(saveError || error) && <p role="alert" className="mt-1.5 text-[13px] text-alert">{saveError ?? error}</p>}
       {runs.length === 0 ? (
         <p className="mt-3 text-[13px] text-mut">{t("No saved runs yet.")}</p>

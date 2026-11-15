@@ -31,6 +31,14 @@ class Farm(IdMixin, TimestampMixin, Base):
     # The farm's point (WGS84), where its map opens before any field is drawn. Optional: fields locate a farm too.
     location_lat: Mapped[float | None] = mapped_column(Float)
     location_lon: Mapped[float | None] = mapped_column(Float)
+    # The account that owns this farm (accounts.users.id, migration 0004). None: a public farm such as the demo farm,
+    # which everyone may read and nobody may change (app/access.py). No foreign key, so CropTwin doesn't depend on
+    # the accounts tables.
+    owner_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
+
+    @property
+    def public(self) -> bool:
+        return self.owner_id is None
 
     fields: Mapped[list[Field]] = relationship(back_populates="farm", cascade="all, delete-orphan",
                                                order_by="Field.created_at")

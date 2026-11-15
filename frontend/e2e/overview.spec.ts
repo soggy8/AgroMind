@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { signUp } from "./account";
 
 // The Overview is the app's front door: one next step, the farm on the map, and the three tools as doors.
 test.use({ reducedMotion: "reduce" });
@@ -34,6 +35,7 @@ test("the next step and each door open the right dashboard", async ({ page }) =>
 });
 
 test("a farm with no fields is told to draw one first", async ({ page }) => {
+  await signUp(page);
   const made = await page.request.post("/api/farms", { data: { name: `E2E empty ${Date.now()}` } });
   const id = (await made.json()).id as string;
   try {

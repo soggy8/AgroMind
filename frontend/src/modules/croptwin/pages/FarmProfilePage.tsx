@@ -9,6 +9,7 @@
 import { AlertTriangle, LocateFixed, MapPin, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useMap } from "react-leaflet";
+import { useAuth } from "../../../app/auth";
 import { TopBar } from "../../../app/TopBar";
 import type { Route } from "../../../app/route";
 import { Button, Glass, SegmentedTabs, Skeleton, StatusPill, Tour, tourSeen, type TourStep } from "../../../shared/components";
@@ -116,6 +117,7 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
   const desktop = useMedia(DESKTOP);
   const u = useUnits();
   const confirm = useConfirm();
+  const auth = useAuth();
   const [touring, setTouring] = useState(false);
   const endTour = useCallback(() => setTouring(false), []);
   const [sheet, setSheet] = useState<"farm" | "field">("farm");
@@ -226,6 +228,9 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
       setNewFarm(emptyNewFarm());
     }
   };
+  // A farm of your own needs an account: visitors are asked to create one first, then the new farm opens.
+  const ownFarm = () => auth.requireAccount(() => void startNewFarm(),
+    tr("Create a free account to add your own farm. Your farms and fields are private to you."));
 
   const createFarm = async () => {
     if (!newFarm) return;
@@ -389,14 +394,14 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
 
   const picker = farms.farms && (
     <FarmPicker farms={farms.farms} selectedId={farmId} disabled={!!drawing}
-      onSwitch={(id) => void switchFarm(id)} onNew={() => void startNewFarm()} onDelete={farm ? () => void deleteFarm() : undefined} />
+      onSwitch={(id) => void switchFarm(id)} onNew={ownFarm} onDelete={farm && !farm.public ? () => void deleteFarm() : undefined} />
   );
   const left = newFarm ? (
     <NewFarmPanel draft={newFarm} onChange={(patch) => setNewFarm((d) => d && { ...d, ...patch })}
       onLocate={() => void locate((l) => pickPoint(l.point, "your location"))} locating={locating}
       onCreate={() => void createFarm()} onCancel={() => setNewFarm(null)} creating={creating} error={createError}
       canCancel={!!farms.farms?.length} />
-  ) : farm ? <FarmPanel p={p} picker={picker} /> : <PanelSkeleton />;
+  ) : farm ? <FarmPanel p={p} picker={picker} onOwnFarm={ownFarm} signedIn={!!auth.user} /> : <PanelSkeleton />;
   const right = farm ? <FieldPanel p={p} /> : <PanelSkeleton />;
   const showRight = !newFarm && (!farm || p.selectedId);
 

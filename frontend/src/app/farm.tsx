@@ -1,11 +1,13 @@
 /**
  * The open farm, shared by every dashboard. The top bar's farm switcher sets it; the Command Center, the Simulator
  * and the Farm profile all show it. Remembered per browser under CropTwin's key ("agromind.croptwin.farm"), and a
- * `?farm=<id>` in the page address picks it on load. The farm list itself comes from CropTwin.
+ * `?farm=<id>` in the page address picks it on load. The farm list itself comes from CropTwin: the public demo farm
+ * plus the signed-in user's own farms, so it reloads when someone signs in or out (app/auth).
  */
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { croptwinApi } from "../modules/croptwin/api/croptwinApi";
 import type { FarmSummary } from "../modules/croptwin/types";
+import { useAuth } from "./auth";
 
 const KEY = "agromind.croptwin.farm";
 export const DEMO_FARM = "demo";
@@ -70,7 +72,25 @@ export function FarmProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Load straight away (the session cookie goes with the request, so the list is already the right one), and again
+  // when someone signs in or out. Signing in opens the user's own farm.
   useEffect(() => { void refresh(); }, [refresh]);
+  const { user, loading } = useAuth();
+  const userId = loading ? undefined : (user?.id ?? null);
+  const lastUser = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (userId === undefined) return;
+    const before = lastUser.current;
+    lastUser.current = userId;
+    if (before === undefined || before === userId) return; // first answer: the list above already fits it
+    void refresh().then((list) => {
+      const own = list?.find((f) => !f.public);
+      if (userId !== null && own) {
+        setSelectedId(own.id);
+        remember(own.id);
+      }
+    });
+  }, [refresh, userId]);
 
   const select = useCallback((id: string) => {
     setSelectedId(id);

@@ -7,6 +7,7 @@ from typing import TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
+from app.modules.accounts import service as accounts
 from app.shared.db import get_session
 
 from . import colour_classes, places, service
@@ -38,8 +39,9 @@ def _no_content(fn: Callable[..., None], *args) -> Response:
 
 
 @router.get("", response_model=list[FarmSummary])
-def list_farms(session: Session = DB):
-    return service.list_farms(session)
+def list_farms(session: Session = DB, user_id: str | None = Depends(accounts.optional_user_id)):
+    """The public demo farm plus the signed-in user's own farms."""
+    return service.list_farms(session, user_id)
 
 
 # Declared before /{farm_id} so "places" isn't read as a farm id.
@@ -69,8 +71,9 @@ def nasa_colour(colormap: str = Query(pattern=r"^[A-Za-z0-9_]{3,100}$"), r: int 
 
 
 @router.post("", response_model=FarmOut, status_code=201)
-def create_farm(body: FarmCreate, session: Session = DB):
-    return _call(service.create_farm, session, body)
+def create_farm(body: FarmCreate, session: Session = DB, user_id: str = Depends(accounts.require_user_id)):
+    """A new farm owned by the signed-in user (an account is needed)."""
+    return _call(service.create_farm, session, body, None, user_id)
 
 
 @router.get("/{farm_id}", response_model=FarmOut)

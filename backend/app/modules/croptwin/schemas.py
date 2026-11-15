@@ -150,6 +150,8 @@ class FarmOut(_Orm):
     constraints: str | None
     location_lat: float | None
     location_lon: float | None
+    # True for a farm without an owner (the demo farm): everyone can read it, nobody can change it.
+    public: bool = False
     fields: list[FieldOut]
     created_at: UtcDatetime
     updated_at: UtcDatetime
@@ -205,6 +207,7 @@ class FarmSummary(_Orm):
     name: str
     region: str | None
     field_count: int
+    public: bool = False
 
 
 class AdvisorContext(BaseModel):

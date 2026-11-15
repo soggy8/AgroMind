@@ -160,4 +160,34 @@ export const APP: Record<string, string> = {
   "Review your last run": "Прегледајте ја последната симулација",
   "No field is below its normal on this date. A good time to plan: try a rotation under a NASA climate projection.":
     "Ниту една нива не е под својата нормала на овој датум. Добро време за планирање: испробајте плодоред со климатска проекција на NASA.",
+  // Accounts (app/auth, TopBar) and the read-only demo farm.
+  "Sign in": "Најава",
+  "Account: {email}": "Сметка: {email}",
+  "Signed in as": "Најавени сте како",
+  "Sign out": "Одјава",
+  "Signed in as {email}": "Најавени сте како {email}",
+  "Sign in or create an account": "Најавете се или направете сметка",
+  "Create your account": "Направете сметка",
+  "Sign in to AgroMind": "Најава во AgroMind",
+  "Add your own farm, draw its fields and save simulator runs. Your farms are private to your account.":
+    "Додајте своја фарма, нацртајте ги нивите и зачувајте симулации. Вашите фарми ги гледате само вие.",
+  "Open your own farms. The demo farm stays open to everyone, read-only.":
+    "Отворете ги своите фарми. Демо фармата е отворена за сите, само за читање.",
+  "Email": "Е-пошта",
+  "Password": "Лозинка",
+  "At least 8 characters": "Најмалку 8 знаци",
+  "Create account": "Направи сметка",
+  "Already have an account?": "Веќе имате сметка?",
+  "New to AgroMind?": "Нови сте во AgroMind?",
+  "Create an account": "Направете сметка",
+  "Read-only demo farm": "Демо фарма само за читање",
+  "Demo farm, read-only": "Демо фарма, само за читање",
+  "Look around freely: open the fields, run the Simulator, ask the advisor. To draw your own fields and save changes, add a farm of your own.":
+    "Слободно разгледајте: отворете ги нивите, пуштете го Симулаторот, прашајте го советникот. За да цртате свои ниви и да зачувувате промени, додајте своја фарма.",
+  "Read-only field": "Нива само за читање",
+  "Create a free account to add your own farm. Your farms and fields are private to you.":
+    "Направете бесплатна сметка за да додадете своја фарма. Вашите фарми и ниви ги гледате само вие.",
+  "The demo farm is read-only": "Демо фармата е само за читање",
+  "Add a farm of your own in the Farm profile to save runs.": "Додајте своја фарма во Профил за да зачувувате симулации.",
+  "Create a free account and add your farm to save runs.": "Направете бесплатна сметка и додајте ја фармата за да зачувувате симулации.",
 };

@@ -151,6 +151,8 @@ export interface FarmOut {
   constraints: string | null;
   location_lat: number | null;
   location_lon: number | null;
+  /** A farm without an owner (the demo farm): everyone can read it, nobody can change it. */
+  public: boolean;
   fields: FieldOut[];
   created_at: string;
   updated_at: string;
@@ -206,6 +208,8 @@ export interface FarmSummary {
   name: string;
   region: string | null;
   field_count: number;
+  /** The demo farm: read-only for everyone. */
+  public: boolean;
 }
 
 /** What the AI advisor may use (backend schemas.py AdvisorContext): numbered facts, house rules, starter questions. */

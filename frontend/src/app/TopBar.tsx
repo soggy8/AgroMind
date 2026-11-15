@@ -1,9 +1,10 @@
-import { Check, ChevronDown, CircleHelp, Languages, Menu, MessageSquareText, Settings2 } from "lucide-react";
+import { Check, ChevronDown, CircleHelp, Languages, LogIn, LogOut, Menu, MessageSquareText, Settings2, UserRound } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { Button, SegmentedTabs } from "../shared/components";
 import { type UnitSystem, useUnits } from "../shared/units";
 import { useOptionalAssistant } from "../shared/assistant/AssistantProvider";
 import { LanguageTabs } from "../shared/i18n/LanguageSwitch";
+import { useAuth } from "./auth";
 import { useFarmChoice } from "./farm";
 import { ROUTES, type Route } from "./route";
 import { getLang, t, tn } from "../shared/i18n";
@@ -70,6 +71,61 @@ function FarmList({ onPick, onManage }: { onPick: (id: string) => void; onManage
         className="mt-1 flex min-h-11 w-full items-center gap-2 rounded-ctl border-t border-line px-3 py-2 text-left text-sm font-semibold text-mut hover:bg-glass-hi hover:text-tx">
         <Settings2 size={15} strokeWidth={1.75} /> {t("Add or edit farms")}
       </button>
+    </div>
+  );
+}
+
+/** Sign in, or the signed-in account with Sign out. Visitors can still open the read-only demo farm. */
+function Account() {
+  const { user, loading, openAuth, signOut } = useAuth();
+  const pop = usePopover();
+  if (loading) return null;
+  if (!user) {
+    return (
+      <button type="button" onClick={() => openAuth({ mode: "signin" })} aria-label={t("Sign in")}
+        className="flex h-10 items-center gap-2 whitespace-nowrap rounded-ctl px-2.5 text-sm font-medium text-mut transition-colors hover:bg-glass-hi hover:text-tx">
+        <LogIn size={17} strokeWidth={1.5} /> <span className="hidden xl:inline">{t("Sign in")}</span>
+      </button>
+    );
+  }
+  return (
+    <details ref={pop.ref} className="relative">
+      <summary aria-label={t("Account: {email}", { email: user.email })} title={user.email}
+        className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-ctl text-mut transition-colors hover:bg-glass-hi hover:text-tx [&::-webkit-details-marker]:hidden">
+        <UserRound size={18} strokeWidth={1.5} />
+      </summary>
+      <div className="glass absolute right-0 top-12 z-30 w-64 p-1.5">
+        <p className="px-3 pb-1 pt-2 text-[12px] text-mut">{t("Signed in as")}</p>
+        <p className="truncate px-3 pb-2 text-sm font-medium">{user.email}</p>
+        <button type="button" onClick={() => { pop.close(); void signOut(); }}
+          className="flex min-h-11 w-full items-center gap-2 rounded-ctl border-t border-line px-3 py-2 text-left text-sm font-medium text-mut hover:bg-glass-hi hover:text-tx">
+          <LogOut size={15} strokeWidth={1.5} /> {t("Sign out")}
+        </button>
+      </div>
+    </details>
+  );
+}
+
+/** The phone menu's account row. */
+function MenuAccount({ onDone }: { onDone: () => void }) {
+  const { user, loading, openAuth, signOut } = useAuth();
+  if (loading) return null;
+  return (
+    <div className="mt-1 border-t border-line px-1 pt-1">
+      {user ? (
+        <>
+          <p className="truncate px-2 pt-2 text-[12px] text-mut">{t("Signed in as {email}", { email: user.email })}</p>
+          <button type="button" onClick={() => { onDone(); void signOut(); }}
+            className="flex min-h-11 w-full items-center gap-2 rounded-ctl px-2 py-2 text-left text-sm font-medium text-mut hover:bg-glass-hi hover:text-tx">
+            <LogOut size={15} strokeWidth={1.5} /> {t("Sign out")}
+          </button>
+        </>
+      ) : (
+        <button type="button" onClick={() => { onDone(); openAuth({ mode: "signin" }); }}
+          className="flex min-h-11 w-full items-center gap-2 rounded-ctl px-2 py-2 text-left text-sm font-medium hover:bg-glass-hi">
+          <LogIn size={15} strokeWidth={1.5} /> {t("Sign in or create an account")}
+        </button>
+      )}
     </div>
   );
 }
@@ -173,6 +229,7 @@ export function TopBar({ route, onNavigate, status, actions, onHelp, onAdvisor, 
             <UnitsToggle />
           </div>
         </details>
+        <div className="hidden md:block"><Account /></div>
       </div>
       <details ref={menu.ref} className="relative md:hidden">
         <summary className="grid h-11 w-11 cursor-pointer list-none place-items-center rounded-ctl border border-line bg-glass-hi [&::-webkit-details-marker]:hidden" aria-label={t("Menu")}>
@@ -191,6 +248,7 @@ export function TopBar({ route, onNavigate, status, actions, onHelp, onAdvisor, 
           <div className="mt-1 border-t border-line pt-1">
             <FarmList onPick={pick} onManage={manage} />
           </div>
+          <MenuAccount onDone={menu.close} />
           <div className="mt-1 flex items-center justify-between border-t border-line px-3 pb-1 pt-2.5">
             <span className="text-[12px] font-semibold uppercase tracking-[.06em] text-mut">{t("Units")}</span>
             <UnitsToggle />

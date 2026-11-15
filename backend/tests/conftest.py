@@ -21,12 +21,23 @@ def db_session():
 
 
 @pytest.fixture
-def client(db_session):
+def anon_client(db_session):
+    """The API as a visitor who isn't signed in."""
     from app.main import app
+    from app.modules.accounts.service import reset_rate_limit
 
+    reset_rate_limit()
     app.dependency_overrides[get_session] = lambda: db_session
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client(anon_client):
+    """The API as a signed-in farmer, who owns the farms they create (most tests act as one)."""
+    r = anon_client.post("/api/auth/signup", json={"email": "farmer@example.com", "password": "correct horse"})
+    assert r.status_code == 201, r.text
+    return anon_client
 
 
 @pytest.fixture(autouse=True)

@@ -30,8 +30,10 @@ export function FieldPanel({ p }: { p: FarmProfile }) {
       </div>
     );
   }
+  // The demo farm is read-only (app/access.py): everything shows, nothing can be changed.
   return (
-    <div key={d.id} className="scroll-thin h-full min-h-0 space-y-5 overflow-y-auto px-[18px] pb-5 pt-[18px]">
+    <fieldset key={d.id} disabled={!!p.farm?.public} aria-label={p.farm?.public ? tr("Read-only field") : undefined}
+      className="scroll-thin m-0 h-full min-h-0 min-w-0 space-y-5 overflow-y-auto border-0 px-[18px] pb-5 pt-[18px]">
       <FieldEditor key={d.id} p={p} d={d} />
       {!d.isNew && p.farm && (
         <>
@@ -43,7 +45,7 @@ export function FieldPanel({ p }: { p: FarmProfile }) {
       <SoilTable p={p} d={d} />
       <div className="border-t border-line" />
       <CropHistoryList p={p} d={d} />
-    </div>
+    </fieldset>
   );
 }
 

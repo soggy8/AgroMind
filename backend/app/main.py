@@ -7,10 +7,13 @@ Run from backend/:
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.access import farm_access
 from app.core.config import get_settings
+from app.modules.accounts import i18n_mk as accounts_mk
+from app.modules.accounts.router import router as accounts_router
 from app.modules.assistant.router import router as assistant_router
 from app.modules.cropdoctor.router import router as cropdoctor_router
 from app.modules.croptwin.router import router as croptwin_router
@@ -33,7 +36,7 @@ def create_app() -> FastAPI:
 
     # Sentences in responses follow the browser's Accept-Language (English or Macedonian); see app/shared/i18n.py.
     i18n.register("mk", {**shared_mk.CATALOG, **croptwin_mk.CATALOG, **cropdoctor_mk.CATALOG, **simulator_mk.CATALOG,
-                         **economics_mk.CATALOG, **assistant_mk.CATALOG})
+                         **economics_mk.CATALOG, **assistant_mk.CATALOG, **accounts_mk.CATALOG})
     app.add_middleware(i18n.TranslateResponses)
     app.add_middleware(
         CORSMiddleware,
@@ -42,12 +45,15 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.include_router(croptwin_router)
-    app.include_router(simulator_router)
-    app.include_router(economics_router)
-    app.include_router(cropdoctor_router)
+    # Every farm route checks who may open the farm (app/access.py): the demo farm is read-only, own farms private.
+    farm_guard = [Depends(farm_access)]
+    app.include_router(accounts_router)
+    app.include_router(croptwin_router, dependencies=farm_guard)
+    app.include_router(simulator_router, dependencies=farm_guard)
+    app.include_router(economics_router, dependencies=farm_guard)
+    app.include_router(cropdoctor_router, dependencies=farm_guard)
     app.include_router(advisor_router)
-    app.include_router(assistant_router)
+    app.include_router(assistant_router, dependencies=farm_guard)
 
     @app.get("/api/health", tags=["meta"])
     def health() -> dict:

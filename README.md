@@ -22,6 +22,10 @@ Cross-cutting pieces:
 - **`shared/`** — database session, map UI, charts, optional NASA **connectors**, LLM **advisor** client (grounding).
 - **`assistant/`** — farm-scoped chat that operates the app in natural language and cites module facts only.
   See [docs/modules/assistant.md](docs/modules/assistant.md).
+- **`accounts/`** — email and password sign-up and sessions (HttpOnly cookie). See
+  [backend/app/modules/accounts/README.md](backend/app/modules/accounts/README.md). Who may open which farm is
+  decided once, in `app/access.py`, for every `/api/farms/{farm_id}/…` route: the demo farm has no owner, so anyone
+  may read it and run what-ifs on it and nobody may change it; a farm with an owner is visible only to that owner.
 
 ### Dependency rules
 
@@ -44,6 +48,8 @@ Cross-cutting pieces:
 - **Economics** reads the Simulator only through its `service.py` (in `economics/ports.py`). Nothing imports
   Economics except through its `service.py`.
 - Modules talk to each other only through `service.py`; `router.py` is HTTP only.
+- **accounts** depends only on `shared`. CropTwin reads the signed-in user through `accounts/service.py`;
+  `app/access.py` (app level, like `models.py`) uses accounts' and CropTwin's `service.py` to guard farm routes.
 
 ## App pages (frontend)
 
@@ -72,11 +78,12 @@ AgroMind/
 │   │       ├── cropdoctor/  indicators, baselines, anomalies, explanations
 │   │       ├── simulator/   scenarios, rotations, engine, ranking
 │   │       ├── economics/   Simulator results priced: climate bill, bad years, grid
-│   │       └── assistant/   chat agent, tools, NDJSON stream
+│   │       ├── assistant/   chat agent, tools, NDJSON stream
+│   │       └── accounts/    users, sign-in sessions (app/access.py guards farm routes)
 │   └── tests/               mirrors modules/
 ├── frontend/                React + TypeScript + Tailwind
 │   └── src/
-│       ├── app/             routing, landing, layout
+│       ├── app/             routing, landing, layout, auth (sign-in dialog, account state)
 │       ├── shared/          map, charts, assistant UI, api client
 │       └── modules/         croptwin, cropdoctor, simulator, economics
 ├── data/                    samples (committed), raw/processed (git-ignored)

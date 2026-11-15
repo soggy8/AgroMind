@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { signUp } from "./account";
 
 // The three dashboards share one shell: top bar (farm switcher, nav, units, help, advisor), farm choice and units.
 // These checks keep them in step. Reduced motion keeps the demo farm's globe still; tests fly past it when needed.
@@ -7,7 +8,7 @@ test.use({ reducedMotion: "reduce" });
 const PAGES = [
   { route: "command-center", name: "Command Center", ready: (p: Page) => p.getByText("Replay · as of 12 Aug 2012").first() },
   { route: "simulator", name: "Simulator", ready: (p: Page) => p.getByRole("button", { name: "Run simulation" }) },
-  { route: "farm-profile", name: "Farm profile", ready: (p: Page) => p.getByRole("button", { name: /Save farm|All changes saved/ }).first() },
+  { route: "farm-profile", name: "Farm profile", ready: (p: Page) => p.getByText("Demo farm, read-only") },
 ] as const;
 
 async function quietTours(page: Page) {
@@ -81,6 +82,7 @@ test("the farm chosen in the top bar is the farm every dashboard shows", async (
   test.skip(isMobile, "the phone menu lists the same farms; this checks the switch once");
   await quietTours(page);
   const name = `E2E farm ${Date.now()}`;
+  await signUp(page);
   const made = await page.request.post("/api/farms", { data: { name, region: "Test county" } });
   expect(made.ok()).toBeTruthy();
   const id = (await made.json()).id as string;

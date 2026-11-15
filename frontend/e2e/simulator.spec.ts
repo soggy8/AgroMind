@@ -1,13 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
+import { ownFarmLikeDemo } from "./account";
 
 const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 1024;
 
-async function open(page: Page, { tour = false } = {}) {
+async function open(page: Page, { tour = false, farm }: { tour?: boolean; farm?: string } = {}) {
   if (!tour) await page.addInitScript(() => localStorage.setItem("agromind.tour.simulator-v1", "done"));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  await page.goto("/#/simulator");
+  await page.goto(farm ? `/?farm=${farm}#/simulator` : "/#/simulator");
   await expect(page.getByRole("button", { name: "Run simulation" })).toBeVisible();
   return errors;
 }
@@ -38,13 +39,28 @@ async function setUnits(page: Page, label: "US" | "Metric") {
   await page.keyboard.press("Escape");
 }
 
-// Saved runs live in the shared dev database: whatever a test saves is removed afterwards, even if it fails midway.
-const saved: string[] = [];
-test.afterEach(async ({ request }) => {
-  if (!saved.length) return;
-  const runs = (await (await request.get("/api/farms/demo/simulations")).json()) as { id: string; name: string }[];
-  for (const r of runs.filter((x) => saved.includes(x.name))) await request.delete(`/api/farms/demo/simulations/${r.id}`);
-  saved.length = 0;
+// The demo farm is read-only, so saving runs is tested on a farm of the test's own account (e2e/account.ts). Those
+// farms live in the shared dev database: each is deleted afterwards, with its runs, even if the test fails midway.
+const farms: string[] = [];
+test.afterEach(async ({ page }) => {
+  for (const id of farms) await page.request.delete(`/api/farms/${id}`);
+  farms.length = 0;
+});
+
+async function openOwnFarm(page: Page) {
+  const id = await ownFarmLikeDemo(page);
+  farms.push(id);
+  return open(page, { farm: id });
+}
+
+test("the demo farm runs but doesn't save: it asks for an account", async ({ page }) => {
+  await open(page);
+  await run(page);
+  await page.getByRole("tab", { name: "Saved" }).click();
+  await expect(page.getByText("The demo farm is read-only")).toBeVisible();
+  await expect(page.getByLabel("Name for this run")).toHaveCount(0);
+  await page.getByRole("button", { name: "Create an account" }).click();
+  await expect(page.getByRole("dialog", { name: "Create your account" })).toBeVisible();
 });
 
 test("loads the demo farm and runs a hotter, drier scenario", async ({ page }) => {
@@ -92,11 +108,10 @@ test("the heat-response setting changes the scenario result", async ({ page }) =
 });
 
 test("saves, lists and deletes a run", async ({ page }) => {
-  await open(page);
+  await openOwnFarm(page);
   await run(page);
   await page.getByRole("tab", { name: "Saved" }).click();
   const name = `E2E run ${Date.now()}`;
-  saved.push(name);
   await page.getByLabel("Name for this run").fill(name);
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText(name)).toBeVisible();
@@ -180,12 +195,11 @@ test("US units convert areas and water", async ({ page }) => {
 });
 
 test("saved runs can be compared side by side", async ({ page }) => {
-  await open(page);
+  await openOwnFarm(page);
   await run(page);
   await page.getByRole("tab", { name: "Saved" }).click();
   const a = `E2E A ${Date.now()}`;
   const b = `E2E B ${Date.now()}`;
-  saved.push(a, b);
   for (const name of [a, b]) {
     await page.getByLabel("Name for this run").fill(name);
     await page.getByRole("button", { name: "Save", exact: true }).click();

@@ -21,8 +21,10 @@ def soil():
 
 @pytest.fixture
 def api(client, db_session):
-    """API client on a fresh in-memory database holding CropTwin's demo farm."""
+    """Signed-in API client on a fresh in-memory database holding CropTwin's demo farm, owned by the test farmer."""
     from app.modules.croptwin.seed import seed_demo_farm
+    from tests.ownership import claim
 
     seed_demo_farm(db_session)
+    claim(db_session)  # the signed-in test farmer owns it, so runs can be saved
     return client

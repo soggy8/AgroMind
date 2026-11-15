@@ -1,7 +1,7 @@
 """Database reads. Writes are plain ORM adds/deletes in service.py; queries that need care live here."""
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from .models import CropHistory, Farm, Field
@@ -9,10 +9,13 @@ from .models import CropHistory, Farm, Field
 _FIELD_DETAIL = (selectinload(Field.soil_layers), selectinload(Field.crop_history))
 
 
-def list_farms(session: Session) -> list[tuple[Farm, int]]:
+def list_farms(session: Session, owner_id: str | None = None) -> list[tuple[Farm, int]]:
+    """Public farms (no owner) plus the farms `owner_id` owns."""
     counts = (select(Field.farm_id, func.count().label("n")).group_by(Field.farm_id).subquery())
+    visible = Farm.owner_id.is_(None) if owner_id is None else or_(Farm.owner_id.is_(None), Farm.owner_id == owner_id)
     stmt = (select(Farm, func.coalesce(counts.c.n, 0))
             .outerjoin(counts, counts.c.farm_id == Farm.id)
+            .where(visible)
             .order_by(Farm.created_at))
     return [(farm, n) for farm, n in session.execute(stmt)]
 

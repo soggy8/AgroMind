@@ -3,6 +3,7 @@ from datetime import datetime
 
 from app.modules.croptwin import colour_classes
 from app.modules.croptwin.seed import seed_demo_farm
+from tests.ownership import claim
 
 SQUARE = {"type": "Polygon", "coordinates": [[[-93.462, 42.030], [-93.458, 42.030], [-93.458, 42.033],
                                               [-93.462, 42.033], [-93.462, 42.030]]]}
@@ -14,6 +15,7 @@ def _ts(s: str) -> datetime:
 
 def test_unknown_farm_or_field_is_404_everywhere(client, db_session):
     seed_demo_farm(db_session)
+    claim(db_session)
     assert client.patch("/api/farms/nope", json={"name": "x"}).status_code == 404
     assert client.get("/api/farms/demo/fields/nope").status_code == 404
     assert client.patch("/api/farms/demo/fields/nope", json={"name": "x"}).status_code == 404
@@ -24,6 +26,7 @@ def test_unknown_farm_or_field_is_404_everywhere(client, db_session):
 
 def test_invalid_bodies_are_422(client, db_session):
     seed_demo_farm(db_session)
+    claim(db_session)
     assert client.patch("/api/farms/demo/fields/north", json={"area_ha": -3}).status_code == 422
     assert client.post("/api/farms/demo/fields/north/crop-history", json={"season_year": 2024, "crop_id": "rice"}).status_code == 422
     assert client.patch("/api/farms/demo", json={"name": ""}).status_code == 422
@@ -31,6 +34,7 @@ def test_invalid_bodies_are_422(client, db_session):
 
 def test_get_field_succeeds(client, db_session):
     seed_demo_farm(db_session)
+    claim(db_session)
     r = client.get("/api/farms/demo/fields/north")
     assert r.status_code == 200 and r.json()["name"] == "North Field"
 
@@ -60,6 +64,7 @@ def test_saved_and_added_timestamps(client):
 
 def test_soil_layers_carry_retrieved_at(client, db_session):
     seed_demo_farm(db_session)
+    claim(db_session)
     layers = client.get("/api/farms/demo/fields/north").json()["soil_layers"]
     assert all(l["retrieved_at"].startswith("2026-11-14") for l in layers)  # the day in the sample's _source
     r = client.put("/api/farms/demo/fields/north/soil", json=[{"depth_top_cm": 0, "depth_bottom_cm": 30, "clay_pct": 30,
@@ -70,6 +75,7 @@ def test_soil_layers_carry_retrieved_at(client, db_session):
 def test_timestamps_always_carry_utc(client, db_session):
     """Created and re-read rows give the same zone-marked format (SQLite returns naive values on re-read)."""
     seed_demo_farm(db_session)
+    claim(db_session)
     farm = client.patch("/api/farms/demo", json={"constraints": "x"}).json()
     field = client.get("/api/farms/demo/fields/north").json()
     for value in (farm["created_at"], farm["updated_at"], field["created_at"], field["updated_at"],

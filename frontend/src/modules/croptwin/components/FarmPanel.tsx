@@ -3,7 +3,7 @@
  * map point, saved dates, the fields list, priority weights, constraints, and the one primary button "Save farm" with
  * its status line. Reads and writes through state/useFarmProfile.ts. The Simulator starts from these priority weights.
  */
-import { Check, Info, Loader2, MapPin, PenLine, Plus } from "lucide-react";
+import { Check, Info, Loader2, Lock, MapPin, PenLine, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, FieldRow } from "../../../shared/components";
 import { useUnits } from "../../../shared/units";
@@ -23,18 +23,40 @@ const PRIORITIES: { id: PriorityId; label: string }[] = [
 ];
 const LEVELS = [{ v: 0, label: t("Off") }, { v: 1, label: t("Low") }, { v: 2, label: t("Med") }, { v: 3, label: t("High") }];
 
-/** Left panel: farm picker, demo notice, farm details, fields list, priorities, constraints, and "Save farm". */
-export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode }) {
+/**
+ * Left panel: farm picker, demo notice, farm details, fields list, priorities, constraints, and "Save farm".
+ * A public farm (the demo farm) is read-only: its fields can be opened, nothing can be changed, and the notice offers
+ * `onOwnFarm` (an account, then a new farm of your own) instead of "Save farm".
+ */
+export function FarmPanel({ p, picker, onOwnFarm, signedIn }: { p: FarmProfile; picker?: ReactNode; onOwnFarm?: () => void; signedIn?: boolean }) {
   const { farm, farmDraft, drafts, selectedId, drawing, actions } = p;
   const u = useUnits();
   if (!farm || !farmDraft) return null;
   const saveBlocked = !!drawing;
+  const readOnly = farm.public;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="scroll-thin min-h-0 flex-1 space-y-5 overflow-y-auto px-[18px] pb-4 pt-[18px]">
         {picker}
-        {farm.id === "demo" && (
+        {readOnly ? (
+          <div className="rounded-[14px] border border-line px-3 py-3" role="note" aria-label={t("Read-only demo farm")}>
+            <p className="flex items-center gap-2 text-[14px] font-semibold">
+              <Lock size={15} strokeWidth={1.5} className="shrink-0 text-mut" /> {t("Demo farm, read-only")}
+            </p>
+            <p className="mt-1 text-[13px] leading-snug text-mut">
+              {t("Look around freely: open the fields, run the Simulator, ask the advisor. To draw your own fields and save changes, add a farm of your own.")}
+            </p>
+            <p className="mt-1 text-[12px] leading-snug text-mut">
+              {t("Its first three fields are illustrative outlines in Story County, Iowa, and SoilGrids soil comes from one saved sample point.")}
+            </p>
+            {onOwnFarm && (
+              <Button variant="primary" className="mt-3 w-full max-sm:min-h-11" onClick={onOwnFarm}>
+                {signedIn ? <><Plus size={15} strokeWidth={1.75} /> {t("New farm")}</> : t("Create an account")}
+              </Button>
+            )}
+          </div>
+        ) : farm.id === "demo" && (
           <div className="flex gap-2.5 rounded-[14px] border border-line px-3 py-2.5" role="note">
             <Info size={17} strokeWidth={1.75} className="mt-0.5 shrink-0 text-rain" />
             <p className="text-[13px] leading-snug">
@@ -44,6 +66,7 @@ export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode })
           </div>
         )}
 
+        <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
         <section aria-labelledby="farm-h" className="space-y-2.5">
           <h2 id="farm-h" className={sectionTitle}>{t("Farm")}</h2>
           <div>
@@ -68,6 +91,8 @@ export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode })
             {p.loadedAt && <> {t("· data as of {formatTimestamp}", { formatTimestamp: formatTimestamp(p.loadedAt) })}</>}
           </p>
         </section>
+
+        </fieldset>
 
         <div className="border-t border-line" />
 
@@ -97,13 +122,16 @@ export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode })
               })}
             </div>
           )}
-          <Button className="mt-2 w-full max-sm:min-h-11" onClick={() => actions.startNewField()} disabled={!!drawing}>
-            {drafts.length ? <Plus size={16} strokeWidth={1.75} /> : <PenLine size={16} strokeWidth={1.75} />} {t("Draw a field")}
-          </Button>
+          {!readOnly && (
+            <Button className="mt-2 w-full max-sm:min-h-11" onClick={() => actions.startNewField()} disabled={!!drawing}>
+              {drafts.length ? <Plus size={16} strokeWidth={1.75} /> : <PenLine size={16} strokeWidth={1.75} />} {t("Draw a field")}
+            </Button>
+          )}
         </section>
 
         <div className="border-t border-line" />
 
+        <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-5 border-0 p-0">
         <section aria-labelledby="prio-h">
           <h2 id="prio-h" className={`mb-1 ${sectionTitle}`}>{t("Your priorities")}</h2>
           <p className={`mb-2 ${metaCls}`}>{t("The weights the Simulator starts from when it ranks rotations for this farm.")}</p>
@@ -136,9 +164,10 @@ export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode })
             value={farmDraft.constraints} onChange={(e) => actions.setFarmDraft({ constraints: e.target.value })} />
           <p className={`mt-1 ${metaCls}`}>{t("Kept as you write it. The Simulator doesn't read it yet.")}</p>
         </section>
+        </fieldset>
       </div>
 
-      <div className="border-t border-line p-[14px]">
+      {!readOnly && <div className="border-t border-line p-[14px]">
         {p.saveError && <p role="alert" className="mb-2 text-[13px] leading-snug text-alert">{p.saveError}</p>}
         <p className={`mb-2 ${metaCls}`} role="status" aria-live="polite">
           {saveBlocked ? t("Finish or cancel the boundary to save.")
@@ -155,7 +184,7 @@ export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode })
           {p.saving && <Loader2 size={16} className="animate-spin" />}
           {p.saving ? t("Saving…") : t("Save farm")}
         </Button>
-      </div>
+      </div>}
     </div>
   );
 }

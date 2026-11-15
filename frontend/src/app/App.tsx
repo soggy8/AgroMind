@@ -5,6 +5,7 @@ import { SimulatorPage } from "../modules/simulator/pages/SimulatorPage";
 import { AssistantPanel, AssistantProvider } from "../shared/assistant";
 import { useLanguage } from "../shared/i18n";
 import { UnitsProvider } from "../shared/units";
+import { AuthProvider } from "./auth";
 import { FarmProvider, useFarmChoice } from "./farm";
 import { LandingPage } from "./landing/LandingPage";
 import { OverviewPage } from "./overview/OverviewPage";
@@ -19,9 +20,11 @@ export function App() {
   useLanguage();
   return (
     <UnitsProvider>
-      <FarmProvider>
-        <Shell />
-      </FarmProvider>
+      <AuthProvider>
+        <FarmProvider>
+          <Shell />
+        </FarmProvider>
+      </AuthProvider>
     </UnitsProvider>
   );
 }
