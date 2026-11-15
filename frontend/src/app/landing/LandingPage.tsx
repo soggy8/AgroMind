@@ -2,7 +2,7 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { cropdoctorApi } from "../../modules/cropdoctor/api/cropdoctorApi";
 import type { FarmHealth, Indicator } from "../../modules/cropdoctor/types";
-import { Button, KindTag } from "../../shared/components";
+import { Button, KindTag, SiteFooter } from "../../shared/components";
 import { ndviStep } from "../../shared/charts/ndvi";
 import { useMedia } from "../../shared/hooks/useMedia";
 import type { Route } from "../route";
@@ -161,14 +161,11 @@ export function LandingPage({ onNavigate }: { onNavigate: (r: Route) => void }) 
         </section>
       </main>
 
-      <footer className="border-t border-line">
-        <div className="mx-auto grid max-w-[1240px] gap-4 px-5 py-10 text-[13px] leading-relaxed text-mut md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-8 lg:px-8">
-          <Logo />
-          <p>
-            {tr("Built for the NASA Space Apps Challenge. Not an official NASA product and not endorsed by NASA. Satellite imagery © Esri. Globe: NASA Blue Marble Next Generation and VIIRS Black Marble via NASA GIBS. Weather, greenness and climate projections from NASA open data; soil from ISRIC SoilGrids.")}
-          </p>
-        </div>
-      </footer>
+      <SiteFooter lead={<Logo />}>
+        <p>
+          {tr("Built for the NASA Space Apps Challenge. Not an official NASA product and not endorsed by NASA. Satellite imagery © Esri. Globe: NASA Blue Marble Next Generation and VIIRS Black Marble via NASA GIBS. Weather, greenness and climate projections from NASA open data; soil from ISRIC SoilGrids.")}
+        </p>
+      </SiteFooter>
     </div>
   );
 }

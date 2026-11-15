@@ -57,6 +57,12 @@ export const EXTRA: Record<string, string> = {
   "county heat": "топлина според округот",
   "{n} yr": "{n} год.",
   "none": "нема",
+  "Powered by": "Изработено од",
+  "Powered by ESTADA": "Изработено од ESTADA",
+  "AgroMind is a free, open-source project.": "AgroMind е бесплатен проект со отворен код.",
+  "See the code on GitHub": "Погледнете го кодот на GitHub",
+  "All of AgroMind's AI features run on a free API key. If the assistant is slow or has to wait, it's because many people are using it at once.":
+    "Сите AI функции на AgroMind работат на бесплатен API клуч. Ако асистентот е бавен или мора да чека, тоа е затоа што многу луѓе го користат истовремено.",
   "Language and units": "Јазик и мерни единици",
   "{n} soil layer": "{n} слој на почвата",
   "{n} soil layers": "{n} слоеви на почвата",

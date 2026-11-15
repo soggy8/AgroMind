@@ -8,7 +8,7 @@ import type { FarmOut } from "../../modules/croptwin/types";
 import type { SavedRunSummary } from "../../modules/simulator/types";
 import { NDVI_BG, ndviStep } from "../../shared/charts/ndvi";
 import { AssistantChat } from "../../shared/assistant";
-import { Button, Glass, KindTag, Skeleton, StatusPill, Tour, tourSeen, type TourStep } from "../../shared/components";
+import { Button, Glass, KindTag, SiteFooter, Skeleton, StatusPill, Tour, tourSeen, type TourStep } from "../../shared/components";
 import { useMedia } from "../../shared/hooks/useMedia";
 import { FarmMap, type MapField } from "../../shared/map/FarmMap";
 import { type ImageryCapture, imageryCredit, ImageryDateWatcher } from "../../shared/map/ImageryDate";
@@ -124,6 +124,7 @@ export function OverviewPage({ farmId, route, onNavigate }: { farmId: string; ro
           </ol>
         </section>
       </main>
+      <SiteFooter />
       {touring && <Tour id={TOUR_ID} steps={TOUR} onClose={endTour} />}
     </div>
   );
