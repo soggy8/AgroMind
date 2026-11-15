@@ -8,13 +8,14 @@ AgroMind is an agricultural digital twin with an interactive farm simulator. It 
 understand current field conditions, investigate possible crop stress, and compare crop rotations
 under changing climate scenarios, using NASA Earth observations, soil data, and farmer priorities.
 
-## The three modules
+## The modules
 
 | Module | Question it answers | Backend | Frontend |
 |---|---|---|---|
 | **CropTwin** | *What is my farm?* Farm profile, field boundary, soil, crop history, priorities. | `backend/app/modules/croptwin` | `frontend/src/modules/croptwin` |
 | **CropDoctor** | *What is happening on my farm now?* Indicators, anomalies vs. baseline, cautious stress explanations. | `backend/app/modules/cropdoctor` | `frontend/src/modules/cropdoctor` |
 | **Simulator** | *What could happen next?* Rotations × climate scenarios over multiple seasons, ranked by priorities. | `backend/app/modules/simulator` | `frontend/src/modules/simulator` |
+| **Economics** | *What does each option earn, and how bad do the bad years get?* The Simulator's weather years priced in dollars: climate bill, bad-year money, who earns most. | `backend/app/modules/economics` | `frontend/src/modules/economics` |
 
 Cross-cutting pieces:
 
@@ -32,12 +33,16 @@ Cross-cutting pieces:
                  ▲                 │
          ┌───────┴───────┐         │
      CropDoctor      Simulator ────┘
-              assistant (reads all three via service.py)
+                         ▲
+                     Economics (Simulator's service.py only)
+              assistant (reads the modules via service.py)
 ```
 
 - **CropTwin** depends only on `shared`. It is the source of truth for the farm.
 - **CropDoctor** and **Simulator** read the farm through CropTwin's `service.py`, never its tables directly.
 - CropDoctor and Simulator do **not** import each other.
+- **Economics** reads the Simulator only through its `service.py` (in `economics/ports.py`). Nothing imports
+  Economics except through its `service.py`.
 - Modules talk to each other only through `service.py`; `router.py` is HTTP only.
 
 ## App pages (frontend)
@@ -49,6 +54,7 @@ Cross-cutting pieces:
 | `#/farm-profile` | CropTwin — draw fields, soil, priorities |
 | `#/command-center` | CropDoctor — map, indicators, findings |
 | `#/simulator` | Rotation and climate comparison |
+| `#/economics` | Farm money: the climate bill, bad-year money, who earns most |
 
 Use **Ask the advisor** or **Ctrl+K** on any dashboard page for the assistant.
 
@@ -65,13 +71,14 @@ AgroMind/
 │   │       ├── croptwin/    farm profile (models, repository)
 │   │       ├── cropdoctor/  indicators, baselines, anomalies, explanations
 │   │       ├── simulator/   scenarios, rotations, engine, ranking
+│   │       ├── economics/   Simulator results priced: climate bill, bad years, grid
 │   │       └── assistant/   chat agent, tools, NDJSON stream
 │   └── tests/               mirrors modules/
 ├── frontend/                React + TypeScript + Tailwind
 │   └── src/
 │       ├── app/             routing, landing, layout
 │       ├── shared/          map, charts, assistant UI, api client
-│       └── modules/         croptwin, cropdoctor, simulator
+│       └── modules/         croptwin, cropdoctor, simulator, economics
 ├── data/                    samples (committed), raw/processed (git-ignored)
 └── docs/                    architecture, data sources, module specs — see docs/README.md
 ```
@@ -131,6 +138,8 @@ The database port is published on `127.0.0.1` only; `POSTGRES_PASSWORD` in `.env
   [docs/modules/cropdoctor.md](docs/modules/cropdoctor.md).
 - **Simulator:** end to end; reads farm, fields and soil from CropTwin; saved runs in the database;
   NASA CMIP6 scenarios, finder, irrigation planner. [docs/modules/simulator.md](docs/modules/simulator.md).
+- **Economics:** API and the Farm money page (`#/economics`); prices each of the Simulator's 25 weather
+  years with USDA and Iowa State numbers or the farmer's own. [docs/modules/economics.md](docs/modules/economics.md).
 - **Assistant:** operates dashboards via chat; grounded on each module's `advisor.py`.
 - **Languages:** English and Macedonian across the site, backend sentences and the assistant included (`docs/i18n.md`). New text: `t()` in the frontend, a template in the module's `i18n_mk.py` in the backend.
   [docs/modules/assistant.md](docs/modules/assistant.md).

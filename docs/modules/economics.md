@@ -3,8 +3,11 @@
 Module 5.5 of `AgroMind_Project_Plan.md`, "Optional Economic Intelligence", turned into a separate
 backend module that puts the Simulator's results into money.
 
-**Status (2026-11-15): designed, not built.** Owner: Kiril. Backend only for now. The screens come
-later, inside andrej's central dashboard, which calls this module's HTTP API.
+**Status (2026-11-15): built, backend and a first screen.** Owner: Kiril (backend design), andrej
+(the screen). API at `/api/farms/{farm_id}/economics`; page at `#/economics` ("Farm money" in the top
+bar). 48 backend tests (`backend/tests/economics/`), 2 Playwright tests (`frontend/e2e/economics.spec.ts`).
+A report with the default 5 x 5 grid takes about 2.2 s after the Simulator has warmed up (limit: 7 s).
+See section 15 for what changed during the build.
 
 Read with: `README.md` (module rules), `DESIGN.md` section 8 (labels), `docs/modules/simulator.md`
 (the model this module sits on), `docs/modules/simulator_calibration.md` (how far the numbers can be
@@ -40,7 +43,7 @@ Goals (all four ship together):
 4. **Your numbers**: rent or own, and your own prices and costs, used by all three blocks and echoed
    back with their labels.
 
-Non-goals (now): any screen; real historical prices, conservation payments and crop insurance
+Non-goals (now): real historical prices, conservation payments and crop insurance
 (ideas 4 to 6, see section 13); advisor facts; saving reports; crops other than maize, soybean and
 oats.
 
@@ -304,8 +307,12 @@ total cost.
 ## 12. Changes outside the module (tell the team)
 
 - `backend/app/main.py`: one `include_router` line for the economics router.
-- `README.md`: Economics in the module table, the dependency diagram and the layout.
-- Nothing in `simulator/`, `croptwin/`, `cropdoctor/` or `shared/`.
+- `README.md`: Economics in the module table, the dependency diagram, the pages and the layout.
+- `frontend/src/app/route.ts` and `App.tsx`: the `economics` route ("Farm money").
+- Assistant: `economics` added to its page lists (`backend/app/modules/assistant/schemas.py`, `agent.py`,
+  `tools.py`; `frontend/src/shared/assistant/types.ts`, `AssistantProvider.tsx`) so it can open the page.
+  The page is only opened, not operated, like the Overview.
+- Nothing in `simulator/`, `croptwin/`, `cropdoctor/` or `shared/` (backend).
 
 ## 13. Later
 
@@ -329,3 +336,39 @@ These weren't discussed. They're the writer's calls:
 5. Bad-year money counts seasons, not calendar years, and also reports losing runs out of 25.
 6. Irrigated runs use each season's p50 irrigation for every track (section 6.6).
 7. `/defaults` also exists, so the dashboard can fill the "your numbers" form.
+
+## 15. Build notes (2026-11-15)
+
+Run it, with the API on port 8000:
+
+```bash
+curl http://localhost:8000/api/farms/demo/economics/defaults
+curl -X POST http://localhost:8000/api/farms/demo/economics/report \
+     -H 'Content-Type: application/json' -d '{"field_id":"north"}'
+```
+
+What changed from the plan while building:
+
+- **Runs are cached by scenario** inside one report, so today's run doubles as the grid's 0 °C row (when
+  the grid's rain change is 0) and a slider scenario that sits on the grid reuses its row. The default
+  report makes 6 Simulator calls, not 8.
+- **`your_cell.exact` is always false for a NASA projection**, even if its median warming lands on a grid
+  value: a grid row is a uniform shift, a projection is month by month.
+- **The farmer's maize cost** keeps ISU's corn-after-corn premium on top for maize after maize; the input
+  list says so.
+- **Assumptions for an input the farmer replaced are dropped** (oats cost, irrigation cost, cover-crop
+  cost): the ASSUME value isn't used then.
+- **"Loses money in every simulated season"** replaces "about 10 of every 10 seasons".
+- **The screen** (`frontend/src/modules/economics/`): field, rotations (pick yours, add rye), climate
+  (NASA projection or sliders, heat response), all-crop price change, rent or own, and the farmer's own
+  prices and costs in $/bu and $/ac (US units) or $/t and $/ha (metric). Results: the climate bill,
+  bad-year money, the who-earns-most grid (cells name the winner, so colour is never the only signal; your
+  cell outlined), and every number used with its source. It reads fields and projections from
+  `simulatorApi.getOptions` and the rotation colours from the Simulator's `rotationColors`. The page's
+  English strings go through `t()` but have no Macedonian entries yet, and the backend's economics
+  sentences aren't translated.
+- With the demo field and the default NASA 2050s middle-emissions projection, Maize → Soybean's margin
+  falls from about $86/ha to about −$467/ha a year under the US-research heat response, and by about
+  $132/ha with this county's heat response. The gap between those two is the model's main uncertainty;
+  the page shows both.
+
