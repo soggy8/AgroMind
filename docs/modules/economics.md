@@ -296,7 +296,9 @@ total cost.
     scenario `annual` p10 / p50 / p90 matches the Simulator's `Economics.margin_per_ha` within
     $3/ha/yr. The tolerance comes from the Simulator rounding `track_seasons` to 0.001 (up to about
     $1.20/ha a season for maize), plus both sides rounding to whole dollars.
-  - Report time with the default grid is printed; the target is under 5 s.
+  - Report time with the default grid is printed and must be **at most 7 s** (Kiril, 2026-11-15),
+    measured after the Simulator has warmed up. If it's slower, make the report faster (for example by
+    reusing the today run for a grid row with no warming and no rain change); don't shrink the default grid.
 - `frontend`: `npm run build` passes with the new `types.ts`.
 
 ## 12. Changes outside the module (tell the team)

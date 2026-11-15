@@ -514,7 +514,7 @@ def test_report_matches_simulator_margins(api):
             assert abs(by_id[r["rotation_id"]][q] - r["economics"]["margin_per_ha"][q]) <= 3
     assert rep["climate_bill"]["kind"] == "modelled" and rep["area"]["kind"] == "observed"
     assert rep["who_earns_most"]["cells"] and len(rep["who_earns_most"]["cells"]) == 5
-    assert time.perf_counter() - t0 < 15
+    assert time.perf_counter() - t0 <= 7  # Kiril: 7 s max
 
 def test_errors(api):
     assert api.post("/api/farms/nope/economics/report", json={"field_id": "north"}).status_code == 404
@@ -534,7 +534,7 @@ Expected: FAIL, 404 on `/economics/defaults`
 - [ ] **Step 4: Run to see them pass, and record the time**
 
 Run: `.venv/bin/python -m pytest tests/economics/test_api.py -q -s`
-Expected: 3 passed, and a line `economics report: X.XX s`. If a consistency check fails, find which of the spec §6.2 rules (predecessor, cover crop, rent split) disagrees with `simulator/service.py::_rotation_result`. Fix the economics side; never the Simulator.
+Expected: 3 passed, and a line `economics report: X.XX s` with X.XX ≤ 7. If it's slower, make `build_report` faster without shrinking the default grid (reuse the today run for a grid row with `w == 0` and grid rain 0; reuse runs that share a scenario). If a consistency check fails, find which of the spec §6.2 rules (predecessor, cover crop, rent split) disagrees with `simulator/service.py::_rotation_result`. Fix the economics side; never the Simulator.
 
 - [ ] **Step 5: Full checks**
 
