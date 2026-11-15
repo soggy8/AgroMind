@@ -7,7 +7,8 @@ import numpy as np
 import pytest
 
 from app.modules.economics import money, ports, service
-from app.modules.economics.parameters import CROP_MONEY, DEFAULT_YOURS_SOURCE, RENT_USD_HA
+from app.modules.economics.parameters import (CROP_MONEY, DEFAULT_YOURS_SOURCE, NEAR_TIE_SOURCE, RENT_SOURCE,
+                                              RENT_USD_HA)
 from app.modules.economics.schemas import EconomicsRequest, EconScenario, RotationInput, YourNumbers
 from app.modules.economics.sentences import CAVEAT, NOT_CALIBRATED, OWN_LAND
 
@@ -100,6 +101,9 @@ def test_bad_years_per_priced_rotation():
     assert b.annual_margin.unit == "USD/ha/year" and b.season_margin.unit == "USD/ha/season"
     s = by_id["S"]
     assert s.losing_season_share == 0.5 and abs(s.worst_season_usd_ha - other) <= 0.5
+    assert b.sources == [M.sources["price"], M.sources["yield"], M.sources["cost"],
+                         S.sources["price"], S.sources["yield"], S.sources["cost"], RENT_SOURCE]
+    assert M.sources["price"] not in s.sources and RENT_SOURCE in s.sources  # only that rotation's crops
 
 
 def test_only_one_priced_rotation():
@@ -188,6 +192,8 @@ def test_grid_matches_climate_bill_and_applies_prices():
     assert abs(who.cells[2][zero].margin_p50_usd_ha["B"] - plain.scenario.p50) <= 1
     assert bill.scenario.p50 > plain.scenario.p50  # the requested +10 % prices reach the climate bill
     assert who.sentence
+    assert NEAR_TIE_SOURCE in who.sources and {M.sources["price"], S.sources["price"], RENT_SOURCE} <= set(who.sources)
+    assert len(who.sources) == len(set(who.sources))
 
 
 def test_defaults_and_inputs_used():
@@ -202,6 +208,8 @@ def test_defaults_and_inputs_used():
     mine = next(i for i in rep.inputs_used if i.id == "price.maize")
     assert (mine.value, mine.display, mine.source) == (190, "$190.00/t", "Your number")
     assert "Your number" in rep.climate_bill.sources
+    own_maize = report(your_numbers=YourNumbers(costs_before_rent_usd_ha={"maize": 1000}), rotations=[MM])
+    assert service.AFTER_SELF_SOURCE in own_maize.bad_years[0].sources
 
 
 def test_own_maize_cost_keeps_corn_after_corn_extra():

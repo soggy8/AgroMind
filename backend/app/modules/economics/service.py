@@ -173,6 +173,14 @@ def _stat(values: np.ndarray, unit: str) -> Stat:
     return Stat(p10=_usd(q.p10), p50=_usd(q.p50), p90=_usd(q.p90), unit=unit)
 
 
+def _sources(rotations: list[RotationInput], inputs: list[MoneyInput], *extra: str) -> list[str]:
+    """Price, yield and cost sources of the rotations' crops, then rent and any extras: de-duplicated, in order."""
+    src = {i.id: i.source for i in inputs}
+    ids = [i for r in rotations for c in r.crops for i in (f"price.{c}", f"yield.{c}", f"cost.{c}", f"cost_after_self.{c}")
+           if i in src]
+    return list(dict.fromkeys([src[i] for i in ids] + [src["rent"]] + list(extra)))
+
+
 # ---------- blocks (spec section 6.4) ----------
 
 def _best_alternative(yours: RotationInput, priced: list[RotationInput], scen: dict[str, np.ndarray],
@@ -205,7 +213,7 @@ def _climate_bill(req: EconomicsRequest, yours: RotationInput, priced: list[Rota
         best_alternative=best, sentence=sentence, sources=sources)
 
 
-def _bad_years(r: RotationInput, seasons: np.ndarray, years: int, units: str) -> BadYears:
+def _bad_years(r: RotationInput, seasons: np.ndarray, years: int, units: str, sources: list[str]) -> BadYears:
     cushion = money.cash_cushion(seasons)
     share = round(money.losing_season_share(seasons), 3)
     worst, cushion_worst = _usd(seasons.min()), _usd(cushion.max())
@@ -214,7 +222,7 @@ def _bad_years(r: RotationInput, seasons: np.ndarray, years: int, units: str) ->
         season_margin=_stat(seasons.ravel(), SEASON), seasons_total=int(seasons.size), losing_season_share=share,
         losing_runs=money.losing_runs(seasons), runs=int(seasons.shape[1]), worst_season_usd_ha=worst,
         cash_cushion_worst_usd_ha=cushion_worst, cash_cushion_typical_usd_ha=_usd(money.p3(cushion).p50),
-        sentence=sentences.bad_years(r.name, share, worst, cushion_worst, units))
+        sentence=sentences.bad_years(r.name, share, worst, cushion_worst, units), sources=sources)
 
 
 def _nearest(values: list[float], target: float) -> int:
@@ -222,7 +230,7 @@ def _nearest(values: list[float], target: float) -> int:
 
 
 def _grid(req: EconomicsRequest, yours: RotationInput, pricing: _Pricing, row_runs: list[ports.Run],
-          rain: float, rain_source: str, warming: float) -> WhoEarnsMost:
+          rain: float, rain_source: str, warming: float, sources: list[str]) -> WhoEarnsMost:
     g = req.grid
     cells: list[list[GridCell]] = []
     for run in row_runs:  # rows are warming levels; prices change by arithmetic, so only rows need runs
@@ -240,7 +248,7 @@ def _grid(req: EconomicsRequest, yours: RotationInput, pricing: _Pricing, row_ru
     return WhoEarnsMost(
         warming_c=g.warming_c, price_change_pct=g.price_change_pct, price_crop=req.price_crop,
         rain_change_pct=rain, rain_change_source=rain_source, cells=cells, your_cell=YourCell(row=r, col=c, exact=exact),
-        sentence=sentences.switch(sp, {p.id: p.name for p in pricing.rotations}, yours.id))
+        sentence=sentences.switch(sp, {p.id: p.name for p in pricing.rotations}, yours.id), sources=sources)
 
 
 def _assumptions(req: EconomicsRequest, priced: list[RotationInput], yours: RotationInput, yours_assumed: bool,
@@ -319,18 +327,16 @@ def build_report(session: Session, farm_id: str, req: EconomicsRequest, *, port=
     today = pricing.annual(pricing.seasons(run(temp_delta_c=0.0, rain_change_pct=0.0, projection=None), pct))
     other = pricing.annual(pricing.seasons(run(heat_response=_other_heat_response(sc.heat_response)), pct))
 
-    src = {i.id: i.source for i in inputs}
-    sources = list(dict.fromkeys([src[f"{k}.{c}"] for c in yours.crops for k in ("price", "yield", "cost")]
-                                 + [src["rent"]]))
-    bill = _climate_bill(req, yours, priced, field.area_ha, today, scen, other, label, sources)
-    bad = [_bad_years(r, scen_seasons[r.id], sc.years, req.units) for r in priced]
+    bill = _climate_bill(req, yours, priced, field.area_ha, today, scen, other, label, _sources([yours], inputs))
+    bad = [_bad_years(r, scen_seasons[r.id], sc.years, req.units, _sources([r], inputs)) for r in priced]
 
     grid = None
     if len(priced) >= 2:
         rain = max(-50.0, min(30.0, proj.rain_change_pct if proj else sc.rain_change_pct))
         rain_source = "the projection's May-Sep median rain change" if proj else "the scenario's rain change"
         rows = [run(temp_delta_c=w, rain_change_pct=rain, projection=None) for w in req.grid.warming_c]
-        grid = _grid(req, yours, pricing, rows, rain, rain_source, proj.temp_change_c if proj else sc.temp_delta_c)
+        grid = _grid(req, yours, pricing, rows, rain, rain_source, proj.temp_change_c if proj else sc.temp_delta_c,
+                     _sources(priced, inputs, NEAR_TIE_SOURCE))
 
     notes = [sentences.CAVEAT, sentences.OWN_LAND if req.your_numbers.land == "own" else sentences.RENT_LAND]
     if grid is None:

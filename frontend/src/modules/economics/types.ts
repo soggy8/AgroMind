@@ -115,6 +115,7 @@ export interface BadYears {
   cash_cushion_worst_usd_ha: number;
   cash_cushion_typical_usd_ha: number;
   sentence: string;
+  sources: string[];
 }
 
 export interface GridCell {
@@ -139,6 +140,7 @@ export interface WhoEarnsMost {
   cells: GridCell[][]; // cells[row][col], rows = warming
   your_cell: YourCell;
   sentence: string;
+  sources: string[];
 }
 
 export interface ExcludedRotation {

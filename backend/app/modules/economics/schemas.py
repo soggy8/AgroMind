@@ -186,6 +186,7 @@ class BadYears(BaseModel):
     cash_cushion_worst_usd_ha: float
     cash_cushion_typical_usd_ha: float
     sentence: str
+    sources: list[str]
 
 
 class GridCell(BaseModel):
@@ -210,6 +211,7 @@ class WhoEarnsMost(BaseModel):
     cells: list[list[GridCell]]  # cells[row][col], rows = warming
     your_cell: YourCell
     sentence: str
+    sources: list[str]
 
 
 class ExcludedRotation(BaseModel):
