@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.modules.assistant.router import router as assistant_router
 from app.modules.cropdoctor.router import router as cropdoctor_router
 from app.modules.croptwin.router import router as croptwin_router
+from app.modules.economics.router import router as economics_router
 from app.modules.simulator.router import router as simulator_router
 from app.shared.advisor.router import router as advisor_router
 from app.modules.assistant import i18n_mk as assistant_mk
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
 
     app.include_router(croptwin_router)
     app.include_router(simulator_router)
+    app.include_router(economics_router)
     app.include_router(cropdoctor_router)
     app.include_router(advisor_router)
     app.include_router(assistant_router)
