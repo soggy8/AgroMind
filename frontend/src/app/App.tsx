@@ -1,5 +1,6 @@
 import { CommandCenterPage } from "../modules/cropdoctor/pages/CommandCenterPage";
 import { FarmProfilePage } from "../modules/croptwin/pages/FarmProfilePage";
+import { EconomicsPage } from "../modules/economics/pages/EconomicsPage";
 import { SimulatorPage } from "../modules/simulator/pages/SimulatorPage";
 import { AssistantPanel, AssistantProvider } from "../shared/assistant";
 import { useLanguage } from "../shared/i18n";
@@ -45,5 +46,6 @@ function Pages({ route, navigate, selectedId }: { route: Route; navigate: (r: Ro
   if (route === "overview") return <OverviewPage key={selectedId} farmId={selectedId} route={route} onNavigate={navigate} />;
   if (route === "command-center") return <CommandCenterPage key={selectedId} farmId={selectedId} route={route} onNavigate={navigate} />;
   if (route === "simulator") return <SimulatorPage key={selectedId} farmId={selectedId} route={route} onNavigate={navigate} />;
+  if (route === "economics") return <EconomicsPage key={selectedId} farmId={selectedId} route={route} onNavigate={navigate} />;
   return <PlaceholderPage route={route} onNavigate={navigate} />;
 }
