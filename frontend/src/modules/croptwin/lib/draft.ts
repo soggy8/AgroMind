@@ -9,6 +9,7 @@ import {
   CROPS, type CropId, type FieldCreate, type FieldOut, type FieldUpdate, type GeoJSONPolygon, type SoilLayerIn,
   type SoilTexture,
 } from "../types";
+import { t } from "../../../shared/i18n";
 
 /** The `source` saved with values the farmer typed in (soilKind() treats these as OBSERVED). */
 export const FARMER_SOURCE = "Farmer-provided";
@@ -72,7 +73,7 @@ export function draftFromField(f: FieldOut): FieldDraft {
 /** An empty, undrawn draft named "Field n". */
 export function newDraft(n: number): FieldDraft {
   return {
-    id: nextKey("new"), isNew: true, name: `Field ${n}`, ring: [], closed: false, current_crop_id: null,
+    id: nextKey("new"), isNew: true, name: t("Field {n}", { n }), ring: [], closed: false, current_crop_id: null,
     irrigation_available: false, soil_texture: null, areaInput: "", soil: [],
   };
 }
@@ -113,13 +114,13 @@ export const boundaryIsNew = (d: FieldDraft, saved?: FieldOut) =>
 export function changesFor(d: FieldDraft, saved?: FieldOut, others: FieldDraft[] = []):
   { error: string } | { create?: FieldCreate; update?: FieldUpdate; soil: SoilLayerIn[] | null } {
   const name = d.name.trim();
-  if (!name) return { error: "Give the field a name." };
-  if (!d.closed || d.ring.length < 3) return { error: `Finish drawing ${name}'s boundary (at least three corners).` };
-  if (selfIntersects(d.ring)) return { error: `${name}'s boundary edges cross. Drag a corner or redraw it so the outline doesn't loop over itself.` };
+  if (!name) return { error: t("Give the field a name.") };
+  if (!d.closed || d.ring.length < 3) return { error: t("Finish drawing {name}'s boundary (at least three corners).", { name }) };
+  if (selfIntersects(d.ring)) return { error: t("{name}'s boundary edges cross. Drag a corner or redraw it so the outline doesn't loop over itself.", { name }) };
   const hits = boundaryIsNew(d, saved) ? overlappingNames(d, others) : [];
-  if (hits.length) return { error: `${name} overlaps ${listNames(hits)}. Adjust its boundary so fields don't share area.` };
+  if (hits.length) return { error: t("{name} overlaps {listNames}. Adjust its boundary so fields don't share area.", { name, listNames: listNames(hits) }) };
   const area = parseArea(d.areaInput);
-  if (area === "invalid") return { error: `${name}'s area must be a number of hectares above 0, or empty.` };
+  if (area === "invalid") return { error: t("{name}'s area must be a number of hectares above 0, or empty.", { name }) };
   const soil = soilIn(d.soil);
   if (!saved) {
     return {

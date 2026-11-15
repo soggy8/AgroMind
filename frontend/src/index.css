@@ -147,3 +147,20 @@ input[type="range"]::-moz-range-thumb {
 }
 .field-chip::before { display: none; }
 .field-chip span { color: var(--color-mut); font-weight: 600; margin-left: 6px; }
+
+/* Farm marker on the 3D globe (shared/map/GlobeView). */
+.globe-farm-marker {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: none; border: 0; padding: 0; font-family: var(--font-sans);
+}
+.globe-farm-marker i {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--color-lime);
+  box-shadow: 0 0 0 4px rgb(198 242 78 / .28), 0 2px 8px rgb(0 0 0 / .5);
+}
+.globe-farm-marker span {
+  background: rgb(14 17 15 / .78); border: 1px solid rgb(255 255 255 / .14); border-radius: 9px;
+  color: var(--color-tx); font-size: 13px; font-weight: 700; padding: 5px 10px; white-space: nowrap;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.globe-farm-marker:hover span, .globe-farm-marker:focus-visible span { border-color: var(--color-lime); }
+.maplibregl-canvas:focus-visible { outline: 2px solid var(--color-lime); outline-offset: -2px; }

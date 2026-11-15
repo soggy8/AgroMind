@@ -5,25 +5,28 @@
  */
 import { Check, Info, Loader2, MapPin, PenLine, Plus } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "../../../shared/components";
+import { Button, FieldRow } from "../../../shared/components";
+import { useUnits } from "../../../shared/units";
 import { formatTimestamp, formatTimestampWithAge } from "../../../shared/map/dates";
 import { cropName, isDirty } from "../lib/draft";
 import type { FarmProfile } from "../state/useFarmProfile";
 import type { PriorityId } from "../types";
 import { inputCls, labelCls, metaCls, sectionTitle } from "./form";
+import { t, tn } from "../../../shared/i18n";
 
 const PRIORITIES: { id: PriorityId; label: string }[] = [
-  { id: "yield", label: "Yield" },
-  { id: "water", label: "Save water" },
-  { id: "risk", label: "Avoid bad years" },
-  { id: "soil", label: "Soil health" },
-  { id: "margin", label: "Margin" },
+  { id: "yield", label: t("Yield") },
+  { id: "water", label: t("Save water") },
+  { id: "risk", label: t("Avoid bad years") },
+  { id: "soil", label: t("Soil health") },
+  { id: "margin", label: t("Margin") },
 ];
-const LEVELS = [{ v: 0, label: "Off" }, { v: 1, label: "Low" }, { v: 2, label: "Med" }, { v: 3, label: "High" }];
+const LEVELS = [{ v: 0, label: t("Off") }, { v: 1, label: t("Low") }, { v: 2, label: t("Med") }, { v: 3, label: t("High") }];
 
 /** Left panel: farm picker, demo notice, farm details, fields list, priorities, constraints, and "Save farm". */
 export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode }) {
   const { farm, farmDraft, drafts, selectedId, drawing, actions } = p;
+  const u = useUnits();
   if (!farm || !farmDraft) return null;
   const saveBlocked = !!drawing;
 
@@ -35,98 +38,88 @@ export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode })
           <div className="flex gap-2.5 rounded-[14px] border border-line px-3 py-2.5" role="note">
             <Info size={17} strokeWidth={1.75} className="mt-0.5 shrink-0 text-rain" />
             <p className="text-[13px] leading-snug">
-              <span className="font-bold">Demo farm with sample data.</span>{" "}
-              <span className="text-mut">Its first three fields are illustrative outlines in Story County, Iowa, and SoilGrids soil comes from one saved sample point.</span>
+              <span className="font-bold">{t("Demo farm with sample data.")}</span>{" "}
+              <span className="text-mut">{t("Its first three fields are illustrative outlines in Story County, Iowa, and SoilGrids soil comes from one saved sample point.")}</span>
             </p>
           </div>
         )}
 
         <section aria-labelledby="farm-h" className="space-y-2.5">
-          <h2 id="farm-h" className={sectionTitle}>Farm</h2>
+          <h2 id="farm-h" className={sectionTitle}>{t("Farm")}</h2>
           <div>
-            <label htmlFor="farm-name" className={labelCls}>Name</label>
+            <label htmlFor="farm-name" className={labelCls}>{t("Name")}</label>
             <input id="farm-name" className={inputCls} value={farmDraft.name} maxLength={200} aria-invalid={!farmDraft.name.trim()}
               onChange={(e) => actions.setFarmDraft({ name: e.target.value })} />
-            {!farmDraft.name.trim() && <p className="mt-1 text-[12px] text-alert">The farm needs a name.</p>}
+            {!farmDraft.name.trim() && <p className="mt-1 text-[12px] text-alert">{t("The farm needs a name.")}</p>}
           </div>
           <div>
-            <label htmlFor="farm-region" className={labelCls}>Region</label>
+            <label htmlFor="farm-region" className={labelCls}>{t("Region")}</label>
             <input id="farm-region" className={inputCls} value={farmDraft.region} maxLength={200}
-              placeholder="e.g. Story County, Iowa" onChange={(e) => actions.setFarmDraft({ region: e.target.value })} />
+              placeholder={t("e.g. Story County, Iowa")} onChange={(e) => actions.setFarmDraft({ region: e.target.value })} />
           </div>
           <p className={`flex items-center gap-1.5 ${metaCls}`}>
             <MapPin size={13} strokeWidth={1.75} className="shrink-0" />
             {farm.location_lat !== null && farm.location_lon !== null
-              ? `Map point ${farm.location_lat.toFixed(5)}, ${farm.location_lon.toFixed(5)}`
-              : "No map point: the map opens on the fields."}
+              ? t("Map point {toFixed}, {toFixed2}", { toFixed: farm.location_lat.toFixed(5), toFixed2: farm.location_lon.toFixed(5) })
+              : t("No map point: the map opens on the fields.")}
           </p>
           <p className={metaCls}>
-            Farm details saved {formatTimestampWithAge(farm.updated_at)}
-            {p.loadedAt && <> · data as of {formatTimestamp(p.loadedAt)}</>}
+            {t("Farm details saved {formatTimestampWithAge}", { formatTimestampWithAge: formatTimestampWithAge(farm.updated_at) })}
+            {p.loadedAt && <> {t("· data as of {formatTimestamp}", { formatTimestamp: formatTimestamp(p.loadedAt) })}</>}
           </p>
         </section>
 
         <div className="border-t border-line" />
 
-        <section aria-labelledby="fields-h">
+        <section aria-labelledby="fields-h" data-tour="fp-fields">
           <div className="mb-2 flex items-baseline justify-between">
-            <h2 id="fields-h" className={sectionTitle}>Fields</h2>
-            <span className="text-[13px] text-mut">{drafts.length} {drafts.length === 1 ? "field" : "fields"}</span>
+            <h2 id="fields-h" className={sectionTitle}>{t("Fields")}</h2>
+            <span className="text-[13px] text-mut">{tn(drafts.length, "{n} field", "{n} fields")}</span>
           </div>
           {drafts.length === 0 ? (
             <div className="rounded-[14px] border border-line p-4">
-              <h3 className="text-[17px] font-bold">Draw your first field</h3>
+              <h3 className="text-[17px] font-bold">{t("Draw your first field")}</h3>
               <p className="mt-1 text-sm leading-normal text-mut">
-                Press Draw a field, then click the map at each corner of the field. You can also type the corner coordinates.
+                {t("Press Draw a field, then click the map at each corner of the field. You can also type the corner coordinates.")}
               </p>
             </div>
           ) : (
-            <div className="space-y-1" role="radiogroup" aria-label="Field to edit">
+            <div className="space-y-1" role="radiogroup" aria-label={t("Field to edit")}>
               {drafts.map((d) => {
                 const on = d.id === selectedId;
                 const saved = p.savedField(d.id);
-                const changed = isDirty(d, saved);
                 return (
-                  <button key={d.id} type="button" role="radio" aria-checked={on} onClick={() => actions.select(d.id)}
-                    disabled={!!drawing && !on}
-                    className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-[14px] border px-3 py-2.5 text-left disabled:opacity-50 ${
-                      on ? "border-white/12 bg-glass-sel" : "border-transparent hover:bg-glass-hi"}`}>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[15px] font-bold">{d.name || "Unnamed field"}</span>
-                      <span className="block text-[13px] text-mut">
-                        {d.current_crop_id ? cropName(d.current_crop_id) : "No current crop"}
-                        {saved ? ` · ${saved.area_ha} ha` : " · not saved yet"}
-                      </span>
-                    </span>
-                    {changed && <span className="shrink-0 text-[12px] font-semibold text-mut">Unsaved</span>}
-                  </button>
+                  <FieldRow key={d.id} radio name={d.name || t("Unnamed field")} shape={d.ring.length >= 3 ? d.ring : undefined} ndviStep={null}
+                    meta={saved ? (d.current_crop_id ? cropName(d.current_crop_id)! : t("No current crop")) : t("Not saved yet")}
+                    value={saved ? u.area(saved.area_ha) : "–"} delta={isDirty(d, saved) ? t("Unsaved") : undefined} tone="watch"
+                    selected={on} disabled={!!drawing && !on} onSelect={() => actions.select(d.id)} />
                 );
               })}
             </div>
           )}
-          <Button className="mt-2 w-full max-sm:min-h-11" onClick={actions.startNewField} disabled={!!drawing}>
-            {drafts.length ? <Plus size={16} strokeWidth={1.75} /> : <PenLine size={16} strokeWidth={1.75} />} Draw a field
+          <Button className="mt-2 w-full max-sm:min-h-11" onClick={() => actions.startNewField()} disabled={!!drawing}>
+            {drafts.length ? <Plus size={16} strokeWidth={1.75} /> : <PenLine size={16} strokeWidth={1.75} />} {t("Draw a field")}
           </Button>
         </section>
 
         <div className="border-t border-line" />
 
         <section aria-labelledby="prio-h">
-          <h2 id="prio-h" className={`mb-1 ${sectionTitle}`}>Your priorities</h2>
-          <p className={`mb-2 ${metaCls}`}>The weights the Simulator starts from when it ranks rotations for this farm.</p>
+          <h2 id="prio-h" className={`mb-1 ${sectionTitle}`}>{t("Your priorities")}</h2>
+          <p className={`mb-2 ${metaCls}`}>{t("The weights the Simulator starts from when it ranks rotations for this farm.")}</p>
           <div className="space-y-1.5">
             {PRIORITIES.map(({ id, label }) => {
               const value = Math.round(farmDraft.priorities[id]);
               return (
                 <div key={id} className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold">{label}</span>
-                  <div role="radiogroup" aria-label={`${label} weight`} className="flex gap-0.5 rounded-[10px] bg-black/25 p-0.5">
+                  <div role="radiogroup" aria-label={t("{label} weight", { label })} className="flex gap-0.5 rounded-[10px] bg-black/25 p-0.5">
                     {LEVELS.map((l) => (
                       <button key={l.v} type="button" role="radio" aria-checked={value === l.v}
                         onClick={() => actions.setFarmDraft({ priorities: { ...farmDraft.priorities, [id]: l.v } })}
                         className={`min-w-[40px] rounded-[8px] px-2 py-1 text-[12px] font-semibold max-sm:min-h-11 max-sm:min-w-11 ${
                           value === l.v ? "bg-glass-sel text-tx shadow-[inset_0_1px_0_rgb(255_255_255/.15)]" : "text-mut hover:text-tx"}`}>
-                        {l.label}
+                        {t(l.label)}
                       </button>
                     ))}
                   </div>
@@ -137,22 +130,22 @@ export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode })
         </section>
 
         <section>
-          <label htmlFor="constraints" className={labelCls}>Constraints</label>
+          <label htmlFor="constraints" className={labelCls}>{t("Constraints")}</label>
           <textarea id="constraints" rows={3} className={`${inputCls} resize-y leading-normal`}
-            placeholder="In your own words, e.g. no irrigation on the west side"
+            placeholder={t("In your own words, e.g. no irrigation on the west side")}
             value={farmDraft.constraints} onChange={(e) => actions.setFarmDraft({ constraints: e.target.value })} />
-          <p className={`mt-1 ${metaCls}`}>Kept as you write it. The Simulator doesn't read it yet.</p>
+          <p className={`mt-1 ${metaCls}`}>{t("Kept as you write it. The Simulator doesn't read it yet.")}</p>
         </section>
       </div>
 
       <div className="border-t border-line p-[14px]">
         {p.saveError && <p role="alert" className="mb-2 text-[13px] leading-snug text-alert">{p.saveError}</p>}
         <p className={`mb-2 ${metaCls}`} role="status" aria-live="polite">
-          {saveBlocked ? "Finish or cancel the boundary to save."
-            : p.dirty ? "You have unsaved changes."
+          {saveBlocked ? t("Finish or cancel the boundary to save.")
+            : p.dirty ? t("You have unsaved changes.")
               : (
                 <span className="inline-flex items-center gap-1">
-                  <Check size={13} strokeWidth={2} className="shrink-0 text-ok" /> {p.lastSaved ?? "All changes saved"}
+                  <Check size={13} strokeWidth={2} className="shrink-0 text-ok" /> {p.lastSaved ?? t("All changes saved")}
                 </span>
               )}
         </p>
@@ -160,7 +153,7 @@ export function FarmPanel({ p, picker }: { p: FarmProfile; picker?: ReactNode })
           className={"w-full !py-3 disabled:border disabled:border-line disabled:text-mut disabled:shadow-none "
             + "disabled:[background:var(--color-glass-hi)]"}>
           {p.saving && <Loader2 size={16} className="animate-spin" />}
-          {p.saving ? "Saving…" : "Save farm"}
+          {p.saving ? t("Saving…") : t("Save farm")}
         </Button>
       </div>
     </div>

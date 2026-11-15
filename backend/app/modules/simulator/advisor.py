@@ -56,7 +56,7 @@ def advisor_context(r: SimulationResult) -> AdvisorContext:
         if limiting:
             line += f" Main limits: {', '.join(sorted(limiting))}."
         facts.append(line)
-    facts.append(f"Recommendation: {r.recommendation.headline}. " + " ".join(r.recommendation.reasons))
+    facts.append(f"Recommendation: {r.recommendation.headline}. " + "".join(f"{x}. " for x in r.recommendation.reasons).strip())
     if r.recommendation.trade_offs:
         facts.append("Trade-offs: " + "; ".join(r.recommendation.trade_offs))
     facts.append(f"Data note: {r.data_note}")

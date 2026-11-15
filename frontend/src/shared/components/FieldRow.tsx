@@ -20,10 +20,11 @@ function thumbPoints(ring: [number, number][]): string {
 const DEFAULT_SHAPE = "3,4 36,2 37,29 4,30";
 
 /**
- * Field row (DESIGN.md section 6): 40px field-shape thumbnail filled with its NDVI colour,
- * name and "Crop · ha", value and delta right-aligned. Selected = glass-sel fill and hairline.
+ * Field row (DESIGN.md section 6), the same in every dashboard's field list: 40px field-shape thumbnail (filled with
+ * its NDVI colour where greenness is shown), name and "Crop · area", value and delta right-aligned.
+ * Selected = glass-sel fill and hairline. `radio` makes it one option of a role="radiogroup" list.
  */
-export function FieldRow({ name, meta, value, delta, deltaNote, ndviStep, tone, selected, onSelect, shape }: {
+export function FieldRow({ name, meta, value, delta, deltaNote, ndviStep, tone, selected, onSelect, shape, radio, disabled }: {
   name: string;
   meta: string;
   value: string;
@@ -34,11 +35,14 @@ export function FieldRow({ name, meta, value, delta, deltaNote, ndviStep, tone, 
   selected: boolean;
   onSelect: () => void;
   shape?: [number, number][];
+  radio?: boolean;
+  disabled?: boolean;
 }) {
   const fill = ndviStep === null ? "fill-glass-hi" : NDVI_FILL[ndviStep];
   return (
-    <button type="button" aria-pressed={selected} onClick={onSelect}
-      className={`grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-[14px] border px-2.5 py-[11px] text-left transition-colors ${
+    <button type="button" onClick={onSelect} disabled={disabled}
+      {...(radio ? { role: "radio", "aria-checked": selected } : { "aria-pressed": selected })}
+      className={`grid min-h-11 w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-[14px] border px-2.5 py-[11px] text-left transition-colors disabled:opacity-50 ${
         selected ? "border-line bg-glass-sel" : "border-transparent hover:bg-glass-hi"
       }`}>
       <svg width="40" height="32" viewBox="0 0 40 32" aria-hidden>

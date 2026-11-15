@@ -6,6 +6,7 @@
 import { AlertTriangle } from "lucide-react";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../../shared/components";
+import { t } from "../../../shared/i18n";
 
 export interface ConfirmOptions {
   title: string;
@@ -41,7 +42,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex='-1'])";
 
 /** Glass dialog (DESIGN.md sections 3 and 8): traps focus, Escape cancels, focus returns where it was. */
-function ConfirmDialog({ title, body, confirmLabel, cancelLabel = "Cancel", danger, onClose }:
+function ConfirmDialog({ title, body, confirmLabel, cancelLabel = t("Cancel"), danger, onClose }:
   ConfirmOptions & { onClose: (ok: boolean) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);

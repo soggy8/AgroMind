@@ -1,4 +1,5 @@
 import type { Scenario, Stat } from "../types";
+import { t, tn } from "../../../shared/i18n";
 
 const minus = "−";
 
@@ -22,9 +23,9 @@ export function usd(x: number): string {
 }
 
 export function scenarioSummary(s: Scenario): string[] {
-  const parts = [`${signed(s.temp_delta_c, 1)} °C`, `${signed(s.rain_change_pct)}% rain`];
-  parts.push(s.irrigation === "none" ? "rain-fed" : s.irrigation === "full" ? "full irrigation" : `irrigation ≤ ${s.irrigation_cap_mm ?? 0} mm`);
-  parts.push(`${s.years} year${s.years === 1 ? "" : "s"}`);
+  const parts = [`${signed(s.temp_delta_c, 1)} °C`, t("{v}% rain", { v: signed(s.rain_change_pct) })];
+  parts.push(s.irrigation === "none" ? t("rain-fed") : s.irrigation === "full" ? t("full irrigation") : t("irrigation ≤ {v} mm", { v: s.irrigation_cap_mm ?? 0 }));
+  parts.push(tn(s.years, "{n} year", "{n} years"));
   return parts;
 }
 

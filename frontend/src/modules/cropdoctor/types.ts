@@ -115,3 +115,10 @@ export interface FarmHealth {
   assumptions: Assumption[];
   sources: string[];
 }
+
+/** What the AI advisor may use (backend schemas.py AdvisorContext): numbered facts, house rules, starter questions. */
+export interface AdvisorContext {
+  instructions: string;
+  facts: string[];
+  suggested_questions: string[];
+}

@@ -121,3 +121,10 @@ class FarmHealth(BaseModel):
     findings: list[Finding]
     assumptions: list[Assumption]
     sources: list[str]
+
+
+class AdvisorContext(BaseModel):
+    """Everything the AI advisor may use to explain a health check. It must not go beyond these facts."""
+    instructions: str
+    facts: list[str]
+    suggested_questions: list[str]

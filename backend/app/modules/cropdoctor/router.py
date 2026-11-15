@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from app.shared.db import get_session
 
 from . import service
-from .schemas import FarmHealth
+from .advisor import advisor_context
+from .schemas import AdvisorContext, FarmHealth
 
 router = APIRouter(prefix="/api/farms/{farm_id}/health", tags=["cropdoctor"])
 
@@ -24,3 +25,11 @@ def get_health(farm_id: str, as_of: date | None = Query(None), session: Session 
         raise HTTPException(422, str(e)) from e
     except service.DataUnavailable as e:
         raise HTTPException(503, str(e)) from e
+
+
+@router.post("/advisor-context", response_model=AdvisorContext)
+def get_advisor_context(farm_id: str, health: FarmHealth):
+    """The facts the AI advisor may use, built from a FarmHealth the client already has."""
+    if health.farm.id != farm_id:
+        raise HTTPException(422, "The health check belongs to a different farm.")
+    return advisor_context(health)

@@ -3,6 +3,7 @@
  * fails. Privacy: callers keep the result in memory only (see requestLocation below).
  */
 import type { LatLng } from "./BoundaryDraw";
+import { t } from "../i18n";
 
 export interface UserLocation {
   point: LatLng;
@@ -28,7 +29,7 @@ export function requestLocation(): Promise<UserLocation> {
 }
 
 export const locationProblemText: Record<LocationProblem, string> = {
-  denied: "Location is blocked for this site. Allow it in the browser's site settings, or search for your area.",
-  unavailable: "Your location couldn't be found right now. Try again, or search for your area.",
-  unsupported: "This browser can't share a location. Search for your area instead.",
+  denied: t("Location is blocked for this site. Allow it in the browser's site settings, or search for your area."),
+  unavailable: t("Your location couldn't be found right now. Try again, or search for your area."),
+  unsupported: t("This browser can't share a location. Search for your area instead."),
 };

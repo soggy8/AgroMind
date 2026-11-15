@@ -7,6 +7,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../../shared/components";
 import type { FarmSummary } from "../types";
 import { labelCls } from "./form";
+import { t, tn } from "../../../shared/i18n";
 
 /** Which farm is open, plus "New farm" and "Delete farm". Switching and deleting ask first (the page decides). */
 export function FarmPicker({ farms, selectedId, onSwitch, onNew, onDelete, disabled }: {
@@ -18,15 +19,15 @@ export function FarmPicker({ farms, selectedId, onSwitch, onNew, onDelete, disab
   disabled?: boolean;
 }) {
   return (
-    <section aria-label="Your farms" className="space-y-2">
+    <section aria-label={t("Your farms")} className="space-y-2">
       {farms.length > 0 && (
         <div>
-          <label htmlFor="farm-picker" className={labelCls}>Farm</label>
+          <label htmlFor="farm-picker" className={labelCls}>{t("Farm")}</label>
           <select id="farm-picker" value={selectedId ?? ""} disabled={disabled} onChange={(e) => onSwitch(e.target.value)}
             className="w-full rounded-ctl border border-line bg-glass-hi px-3 py-2 text-sm font-semibold text-tx max-sm:min-h-11">
             {farms.map((f) => (
               <option key={f.id} value={f.id}>
-                {f.name} · {f.field_count} {f.field_count === 1 ? "field" : "fields"}{f.region ? ` · ${f.region}` : ""}
+                {f.name} · {tn(f.field_count, "{n} field", "{n} fields")}{f.region ? ` · ${f.region}` : ""}
               </option>
             ))}
           </select>
@@ -34,11 +35,11 @@ export function FarmPicker({ farms, selectedId, onSwitch, onNew, onDelete, disab
       )}
       <div className="flex flex-wrap gap-2">
         <Button className="max-sm:min-h-11" onClick={onNew} disabled={disabled}>
-          <Plus size={15} strokeWidth={1.75} /> New farm
+          <Plus size={15} strokeWidth={1.75} /> {t("New farm")}
         </Button>
         {onDelete && (
           <Button variant="ghost" className="hover:!text-alert max-sm:min-h-11" onClick={onDelete} disabled={disabled}>
-            <Trash2 size={15} strokeWidth={1.75} /> Delete farm
+            <Trash2 size={15} strokeWidth={1.75} /> {t("Delete farm")}
           </Button>
         )}
       </div>

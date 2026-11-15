@@ -5,6 +5,7 @@
 import type { LatLng } from "./BoundaryDraw";
 import { tileUrl } from "./gibs";
 import type { NasaLayer } from "./nasaLayers";
+import { t } from "../i18n";
 
 export interface PixelColour { r: number; g: number; b: number; a: number }
 
@@ -24,17 +25,17 @@ export function tilePixel([lat, lon]: LatLng, z: number) {
  */
 export async function samplePixel(layer: NasaLayer, date: string, point: LatLng, signal?: AbortSignal): Promise<PixelColour> {
   const g = layer.gibs;
-  if (!g) throw new Error("This layer has no NASA map tiles to read.");
+  if (!g) throw new Error(t("This layer has no NASA map tiles to read."));
   const { col, row, px, py } = tilePixel(point, g.maxNativeZoom);
   const url = tileUrl(g, date).replace("{z}", String(g.maxNativeZoom)).replace("{y}", String(row)).replace("{x}", String(col));
   const res = await fetch(url, { signal, mode: "cors" });
-  if (!res.ok) throw new Error(res.status === 404 ? "NASA has no tile here for that date." : `NASA GIBS answered ${res.status}.`);
+  if (!res.ok) throw new Error(res.status === 404 ? t("NASA has no tile here for that date.") : t("NASA GIBS answered {status}.", { status: res.status }));
   const bitmap = await createImageBitmap(await res.blob());
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
   canvas.height = bitmap.height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("This browser can't read map pixels.");
+  if (!ctx) throw new Error(t("This browser can't read map pixels."));
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(bitmap, 0, 0);
   const [r, g2, b, a] = ctx.getImageData(px, py, 1, 1).data;

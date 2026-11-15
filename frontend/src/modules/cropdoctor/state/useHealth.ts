@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { cropdoctorApi } from "../api/cropdoctorApi";
 import type { FarmHealth } from "../types";
+import { t } from "../../../shared/i18n";
 
 /**
  * Farm health for a date. `asOf` null asks the API for its default (the 2012 replay on the demo farm).
@@ -23,7 +24,7 @@ export function useHealth(farmId: string) {
       .then((h) => { setHealth(h); setLoading(false); })
       .catch((e: Error) => {
         if (e.name === "AbortError") return;
-        setError(e.message || "Couldn't load the farm's health.");
+        setError(e.message || t("Couldn't load the farm's health."));
         setLoading(false);
       });
     return () => ctrl.abort();

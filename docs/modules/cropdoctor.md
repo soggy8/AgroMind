@@ -2,8 +2,8 @@
 
 Status: **built, 2026-11-14.** The Command Center runs on real data for the demo farm, with the
 West Field finding. **Not built:** the Landsat picture inside each field, SMAP soil moisture, and
-greenness for farms other than the demo farm. The advisor is only a "Work in progress" button
-(see "Still to do").
+greenness for farms other than the demo farm. The advisor answers from the facts in `advisor.py`
+(added 2026-11-14 with the shared advisor).
 Scope notes for the module are in `backend/app/modules/cropdoctor/README.md`.
 
 Decisions marked **(Kiril)** were made by Kiril. Decisions marked **(call)** were made while
@@ -203,7 +203,7 @@ the **centre pixel** of each demo field; the build uses a field mean, so these w
 | Method | Path | Response |
 |---|---|---|
 | GET | `/api/farms/{farm_id}/health?as_of=YYYY-MM-DD` | `FarmHealth` |
-| GET | `/api/farms/{farm_id}/health/advisor-context?as_of=YYYY-MM-DD` | `AdvisorContext` (instructions, facts, suggested questions) |
+| POST | `/api/farms/{farm_id}/health/advisor-context` | `FarmHealth` → `AdvisorContext` (instructions, facts, suggested questions); 422 if the health is another farm's |
 
 Without `as_of` the demo farm answers for the default replay date; other farms answer for today.
 A farm counts as the demo farm when its fields are in the committed greenness sample. **(call)**
@@ -232,7 +232,7 @@ backend/app/modules/cropdoctor/
 ├── parameters.py        new: every threshold, marked ASSUME with its reason
 ├── ports.py             new: CropTwin, sample files, POWER and Planetary Computer fetches
 ├── fetch_samples.py     new: CLI that writes the committed samples
-├── advisor.py           new: fact list for the advisor drawer
+├── advisor.py           new: fact list for the assistant (docs/modules/assistant.md)
 ├── indicators/
 │   ├── vegetation.py    field greenness series, current period for a date
 │   ├── weather.py       30-day rain, mean daily high, reference ET0
@@ -260,9 +260,10 @@ plain data out, no FastAPI, pydantic, database or network. **(call)**
   with its date. **(call)**
 - In a replay the crop label is USDA's for that year ("Corn (2012)"), tagged Modelled; today it is
   the farm profile's. **(call)**
-- "Ask the advisor" opens a dialog like the Simulator's drawer. **Built reduced (Kiril):** the
-  button and a dialog that says "Work in progress" and "The AI advisor isn't built yet." The fact
-  list and the endpoint are not built; the API table row above is the planned design.
+- "Ask the advisor" opens a dialog like the Simulator's drawer. **Built (2026-11-14):** the shared
+  drawer, with facts from `advisor.py` (weather, each field's greenness and status, findings with their
+  check and caveat, assumptions). The endpoint takes the FarmHealth the page already has (POST, like the
+  Simulator), so it doesn't fetch NASA data again. The instructions keep answers cautious.
 - Every state in `DESIGN.md` section 9 is handled.
 - Shared pieces `DESIGN.md` names that do not exist yet get built to its spec: `IndicatorRow`,
   `FieldRow`, `Badge`, `SeasonChart`, `WeeklyStrip`, `NdviKey`.
@@ -296,7 +297,6 @@ plain data out, no FastAPI, pydantic, database or network. **(call)**
 - Exact field names in `schemas.py`, as long as the contents in section 6 are there.
 - How many sample points per field (5 to 9) and the inset.
 - File names and column layout of the samples.
-- Whether the advisor drawer is a shared presentational component or lives in the module.
 - Component breakdown and state handling inside the page.
 
 ## 10. What touches other people's files, and what to tell them

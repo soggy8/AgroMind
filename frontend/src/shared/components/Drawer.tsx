@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
+import { t } from "../i18n";
 
 /** Glass side panel over the page (DESIGN.md: glass on the map, never glass on glass). Esc or backdrop closes. */
 export function Drawer({ title, icon, onClose, children, width = 460, footer }: {
@@ -28,7 +29,7 @@ export function Drawer({ title, icon, onClose, children, width = 460, footer }: 
         className="glass anim-in m-3 flex w-full flex-col overflow-hidden sm:m-5" style={{ maxWidth: width }}>
         <div className="flex items-center justify-between border-b border-line px-[18px] py-4">
           <h2 className="flex items-center gap-2 text-[16px] font-bold">{icon}{title}</h2>
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close"
+          <button ref={closeRef} type="button" onClick={onClose} aria-label={t("Close")}
             className="grid h-9 w-9 place-items-center rounded-ctl text-mut hover:bg-glass-hi hover:text-tx">
             <X size={18} strokeWidth={1.75} />
           </button>

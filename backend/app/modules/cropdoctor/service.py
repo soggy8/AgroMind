@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from . import ports
+from .advisor import advisor_context
 from .anomalies import Scored, score_season, status
 from .baselines import normal
 from .explanations import find
@@ -17,7 +18,7 @@ from .ports import DataUnavailable, FarmInfo, FieldInfo, NotFound
 from .schemas import (Assumption, Crop, Explanation, FarmHealth, FarmRef, FieldHealth, Finding, Indicator,
                       SeasonPoint, Soil, Value)
 
-__all__ = ["NotFound", "DataUnavailable", "InvalidDate", "get_health"]
+__all__ = ["NotFound", "DataUnavailable", "InvalidDate", "get_health", "advisor_context"]
 
 GREENNESS_SOURCE = "MODIS MOD13Q1/MYD13Q1 v6.1 (NASA LP DAAC) via Microsoft Planetary Computer"
 POWER_SOURCE = "NASA POWER daily (MERRA-2)"

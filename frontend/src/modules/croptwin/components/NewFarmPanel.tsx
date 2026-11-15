@@ -8,6 +8,7 @@ import { Button } from "../../../shared/components";
 import type { LatLng } from "../../../shared/map/BoundaryDraw";
 import { ActionError } from "./ActionError";
 import { inputCls, labelCls, metaCls, sectionTitle } from "./form";
+import { t } from "../../../shared/i18n";
 
 export interface NewFarmDraft {
   name: string;
@@ -43,52 +44,52 @@ export function NewFarmPanel({ draft, onChange, onLocate, locating, onCreate, on
     <div className="flex h-full min-h-0 flex-col">
       <div className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-[18px] pb-4 pt-[18px]">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-[21px] font-bold tracking-[-.01em]">New farm</h2>
+          <h2 className="text-[21px] font-bold tracking-[-.01em]">{t("New farm")}</h2>
           {canCancel && (
-            <Button variant="ghost" className="max-sm:min-h-11" onClick={onCancel} aria-label="Cancel the new farm">
-              <X size={15} strokeWidth={1.75} /> Cancel
+            <Button variant="ghost" className="max-sm:min-h-11" onClick={onCancel} aria-label={t("Cancel the new farm")}>
+              <X size={15} strokeWidth={1.75} /> {t("Cancel")}
             </Button>
           )}
         </div>
 
         <div>
-          <label htmlFor="nf-name" className={labelCls}>Name</label>
+          <label htmlFor="nf-name" className={labelCls}>{t("Name")}</label>
           <input id="nf-name" className={inputCls} value={draft.name} maxLength={200} aria-invalid={nameMissing}
             onBlur={() => setTouched(true)} onChange={(e) => onChange({ name: e.target.value })} />
-          {nameMissing && <p className="mt-1 text-[12px] text-alert">The farm needs a name.</p>}
+          {nameMissing && <p className="mt-1 text-[12px] text-alert">{t("The farm needs a name.")}</p>}
         </div>
         <div>
-          <label htmlFor="nf-region" className={labelCls}>Region</label>
-          <input id="nf-region" className={inputCls} value={draft.region} maxLength={200} placeholder="e.g. Story County, Iowa"
+          <label htmlFor="nf-region" className={labelCls}>{t("Region")}</label>
+          <input id="nf-region" className={inputCls} value={draft.region} maxLength={200} placeholder={t("e.g. Story County, Iowa")}
             onChange={(e) => onChange({ region: e.target.value })} />
         </div>
 
         <section aria-labelledby="nf-point-h">
-          <h3 id="nf-point-h" className={sectionTitle}>Where is it?</h3>
-          <p className={`mb-2 ${metaCls}`}>The map opens here until you draw fields. You can also skip this and just draw fields.</p>
+          <h3 id="nf-point-h" className={sectionTitle}>{t("Where is it?")}</h3>
+          <p className={`mb-2 ${metaCls}`}>{t("The map opens here until you draw fields. You can also skip this and just draw fields.")}</p>
           {draft.point ? (
             <p className="mb-2 flex items-center gap-1.5 text-sm">
               <MapPin size={15} strokeWidth={1.75} className="shrink-0 text-lime" />
               <span className="font-semibold tabular-nums">{draft.point[0].toFixed(5)}, {draft.point[1].toFixed(5)}</span>
-              <span className="text-[12px] text-mut">from {draft.pointFrom}</span>
+              <span className="text-[12px] text-mut">{t("from {pointFrom}", { pointFrom: draft.pointFrom })}</span>
             </p>
           ) : (
-            <p className="mb-2 text-sm text-mut">No point chosen yet.</p>
+            <p className="mb-2 text-sm text-mut">{t("No point chosen yet.")}</p>
           )}
           <div className="flex flex-wrap gap-2">
             <Button className="max-sm:min-h-11" onClick={onLocate} disabled={locating}>
-              {locating ? <Loader2 size={15} className="animate-spin" /> : <LocateFixed size={15} strokeWidth={1.75} />} Use my location
+              {locating ? <Loader2 size={15} className="animate-spin" /> : <LocateFixed size={15} strokeWidth={1.75} />} {t("Use my location")}
             </Button>
             <Button className={`max-sm:min-h-11 ${draft.picking ? "!border-lime !text-lime" : ""}`} aria-pressed={draft.picking}
               onClick={() => onChange({ picking: !draft.picking })}>
-              <Crosshair size={15} strokeWidth={1.75} /> {draft.picking ? "Click the map…" : "Pick on the map"}
+              <Crosshair size={15} strokeWidth={1.75} /> {draft.picking ? t("Click the map…") : t("Pick on the map")}
             </Button>
             {draft.point && (
-              <Button variant="ghost" className="max-sm:min-h-11" onClick={() => onChange({ point: null, pointFrom: null })}>Clear</Button>
+              <Button variant="ghost" className="max-sm:min-h-11" onClick={() => onChange({ point: null, pointFrom: null })}>{t("Clear")}</Button>
             )}
           </div>
           <p className={`mt-2 ${metaCls}`}>
-            Or search for a place on the map and choose a result. Your location is only saved if you create the farm with it.
+            {t("Or search for a place on the map and choose a result. Your location is only saved if you create the farm with it.")}
           </p>
         </section>
         <ActionError text={error} />
@@ -98,7 +99,7 @@ export function NewFarmPanel({ draft, onChange, onLocate, locating, onCreate, on
         <Button variant="primary" className="w-full !py-3" disabled={creating}
           onClick={() => { setTouched(true); if (draft.name.trim()) onCreate(); }}>
           {creating && <Loader2 size={16} className="animate-spin" />}
-          {creating ? "Creating…" : "Create farm"}
+          {creating ? t("Creating…") : t("Create farm")}
         </Button>
       </div>
     </div>

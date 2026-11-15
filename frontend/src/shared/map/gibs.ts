@@ -6,6 +6,7 @@
  *  - Worldview: doc/url_parameters.md in github.com/nasa-gibs/worldview (`v`, `l`, `t`)
  */
 import type { NasaLayer } from "./nasaLayers";
+import { t as tr } from "../i18n";
 
 const WMTS = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best";
 
@@ -28,7 +29,7 @@ export function availableDates(g: Gibs): Promise<DateRange[]> {
     const url = `${WMTS}/wmts.cgi?SERVICE=WMTS&REQUEST=DescribeDomains&VERSION=1.0.0&LAYER=${encodeURIComponent(g.id)}`
       + `&TILEMATRIXSET=${encodeURIComponent(g.tileMatrixSet)}`;
     p = fetch(url).then(async (r) => {
-      if (!r.ok) throw new Error(`GIBS answered ${r.status}`);
+      if (!r.ok) throw new Error(tr("GIBS answered {status}", { status: r.status }));
       return parseDomain(await r.text());
     });
     p.catch(() => cache.delete(g.id)); // let a later attempt retry
@@ -87,8 +88,8 @@ export const firstDate = (ranges: DateRange[]) =>
 export function periodText(ranges: DateRange[], date: string): string | null {
   const r = ranges.find((x) => day(x.start) <= day(date) && day(date) <= day(x.end)) ?? null;
   if (!r) return null;
-  if (r.unit === "M") return r.step === 1 ? "monthly" : `every ${r.step} months`;
-  return r.step === 1 ? "daily" : `every ${r.step} days`;
+  if (r.unit === "M") return r.step === 1 ? "monthly" : tr("every {step} months", { step: r.step });
+  return r.step === 1 ? "daily" : tr("every {step} days", { step: r.step });
 }
 
 /** The latest date in any range, as GIBS lists it (callers cap it at today, UTC). */

@@ -4,6 +4,8 @@
  */
 import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
+import { formatDayWithAge } from "./dates";
+import { t } from "../i18n";
 
 /**
  * When the satellite imagery under the map centre was captured, from Esri's own metadata.
@@ -39,7 +41,7 @@ export async function imageryCapture(lat: number, lon: number, zoom: number, sig
     outFields: "SRC_DATE,SRC_RES,SRC_DESC,NICE_DESC,MinMapLevel,MaxMapLevel", returnGeometry: "false", f: "json",
   });
   const res = await fetch(`${CITATIONS}?${q}`, { signal });
-  if (!res.ok) throw new Error(`Esri answered ${res.status}.`);
+  if (!res.ok) throw new Error(t("Esri answered {status}.", { status: res.status }));
   const body = await res.json() as { features?: { attributes: Citation }[]; error?: { message: string } };
   if (body.error) throw new Error(body.error.message);
   const z = Math.round(zoom);
@@ -88,4 +90,16 @@ export function ImageryDateWatcher({ onChange }: { onChange: (c: ImageryCapture 
     };
   }, [map]);
   return null;
+}
+
+/**
+ * The imagery credit for a map's source line, with the capture date when Esri publishes one (DESIGN.md 8.3):
+ * "Imagery © Esri, captured 14 Jul 2025 · 16 months ago (Vantor WV02, 0.5 m)". Every dashboard uses this wording.
+ */
+export function imageryCredit(imagery: ImageryCapture | "error" | null): string {
+  if (imagery === null) return t("Imagery © Esri");
+  if (imagery === "error") return t("Imagery © Esri (capture date unavailable right now)");
+  if (!imagery.date) return t("Imagery © Esri (capture date not published by Esri here)");
+  const extra = [imagery.source, imagery.resolutionM && `${imagery.resolutionM} m`].filter(Boolean).join(", ");
+  return t("Imagery © Esri, captured {formatDayWithAge}{v}", { formatDayWithAge: formatDayWithAge(imagery.date), v: extra ? ` (${extra})` : "" });
 }

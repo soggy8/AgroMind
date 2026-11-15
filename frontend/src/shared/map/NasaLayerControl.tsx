@@ -21,6 +21,7 @@ import type { LatLng } from "./BoundaryDraw";
 import { NASA_LAYERS, type NasaLayer, scaleNote } from "./nasaLayers";
 import { type PixelColour, samplePixel } from "./pixelSample";
 import { ReferenceLayers } from "./ReferenceLayers";
+import { t } from "../i18n";
 
 export interface NasaOverlay {
   key: string | null;
@@ -55,7 +56,7 @@ export function rangeText(r: ValueReading): string {
     return r.low < 0 || r.high < 0 ? `${fmt(r.low)} to ${fmt(r.high)}` : `${fmt(r.low)}–${fmt(r.high)}`;
   }
   if (r.high !== null) return `below ${fmt(r.high)}`;
-  if (r.low !== null) return `${fmt(r.low)} or more`;
+  if (r.low !== null) return t("{fmt} or more", { fmt: fmt(r.low) });
   return "";
 }
 /** Kelvin bounds also in °C (exact: K − 273.15), for farmers who think in Celsius. */
@@ -63,7 +64,7 @@ const celsius = (r: ValueReading) => {
   const c = (k: number) => fmt(Math.round((k - 273.15) * 100) / 100);
   if (r.low !== null && r.high !== null) return `${c(r.low)}–${c(r.high)} °C`;
   if (r.high !== null) return `below ${c(r.high)} °C`;
-  return r.low !== null ? `${c(r.low)} °C or more` : "";
+  return r.low !== null ? t("{c} °C or more", { c: c(r.low) }) : "";
 };
 
 type Status = "idle" | "dates" | "loading" | "ok" | "empty" | "offline";
@@ -269,13 +270,13 @@ export function NasaLayerControl({ value, onChange, style, borders, onBorders, p
         <button ref={pill} type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)}
           className="glass inline-flex min-h-11 items-center gap-2 self-start !rounded-[13px] px-3 py-2 text-left text-[13px] font-semibold">
           <Layers size={16} strokeWidth={1.75} className="shrink-0" />
-          {layer ? <span>NASA: {layer.label}{layer.gibs && value.date ? <span className="font-medium text-mut"> · {formatDate(value.date)}</span> : null}</span>
-            : <span>NASA data</span>}
+          {layer ? <span>{t("NASA:")} {t(layer.label)}{layer.gibs && value.date ? <span className="font-medium text-mut"> · {formatDate(value.date)}</span> : null}</span>
+            : <span>{t("NASA data")}</span>}
           {(status === "dates" || status === "loading") && <Loader2 size={14} className="animate-spin text-mut" />}
         </button>
 
         {open && (
-          <section id={panelId} aria-label="NASA data on the map"
+          <section id={panelId} aria-label={t("NASA data on the map")}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.stopPropagation();
@@ -285,8 +286,8 @@ export function NasaLayerControl({ value, onChange, style, borders, onBorders, p
             }}
             className="glass scroll-thin min-h-0 overflow-y-auto !rounded-[16px] p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-[15px] font-bold">NASA data on the map</h2>
-              <button type="button" aria-label="Close NASA data" onClick={() => setOpen(false)}
+              <h2 className="text-[15px] font-bold">{t("NASA data on the map")}</h2>
+              <button type="button" aria-label={t("Close NASA data")} onClick={() => setOpen(false)}
                 className="grid h-9 w-9 place-items-center rounded-ctl text-mut hover:bg-glass-hi hover:text-tx max-sm:h-11 max-sm:w-11">
                 <X size={16} strokeWidth={1.75} />
               </button>
@@ -296,12 +297,12 @@ export function NasaLayerControl({ value, onChange, style, borders, onBorders, p
               <input type="checkbox" checked={borders} onChange={(e) => onBorders(e.target.checked)}
                 className="h-4 w-4 accent-[var(--color-lime)]" />
               <span>
-                Borders and place names
-                <span className="block text-[12px] font-normal text-mut">Esri, HERE, Garmin, © OpenStreetMap contributors</span>
+                {t("Borders and place names")}
+                <span className="block text-[12px] font-normal text-mut">{t("Esri, HERE, Garmin, © OpenStreetMap contributors")}</span>
               </span>
             </label>
-            <div role="radiogroup" aria-label="NASA layer" className="space-y-0.5">
-              <LayerOption on={!layer} onClick={() => choose(null)} title="None" sub="Satellite imagery only" />
+            <div role="radiogroup" aria-label={t("NASA layer")} className="space-y-0.5">
+              <LayerOption on={!layer} onClick={() => choose(null)} title={t("None")} sub="Satellite imagery only" />
               {NASA_LAYERS.map((l) => (
                 <LayerOption key={l.key} on={layer?.key === l.key} onClick={() => choose(l.key)} title={l.label}
                   sub={`${l.dataset} · ${l.pixelText}${l.gibs ? "" : " · link only"}`} />
@@ -312,46 +313,46 @@ export function NasaLayerControl({ value, onChange, style, borders, onBorders, p
               <div className="mt-3 space-y-2.5 border-t border-line pt-3">
                 <p className="flex flex-wrap items-center gap-1.5 text-[13px]">
                   <KindTag kind={layer.kind} />
-                  <span className="font-semibold">{layer.label}</span>
+                  <span className="font-semibold">{t(layer.label)}</span>
                 </p>
                 <p className="text-[12px] leading-snug text-mut">
-                  NASA {layer.gibs ? "GIBS" : "Earthdata"} · {layer.product.shortName} v{layer.product.version}
+                  {t("NASA")} {layer.gibs ? t("GIBS") : t("Earthdata")} · {layer.product.shortName} v{layer.product.version}
                   {value.date && layer.gibs ? ` · ${formatDate(value.date)}` : ""}
-                  {layer.units ? ` · ${layer.units}` : ""} · {layer.pixelText} pixels
+                  {layer.units ? ` · ${layer.units}` : ""} {t("· {pixelText} pixels", { pixelText: layer.pixelText })}
                 </p>
-                <p className="text-[12px] leading-snug text-mut">{layer.kind === "modelled" ? "Modelled" : "Observed"}: {layer.kindReason}</p>
+                <p className="text-[12px] leading-snug text-mut">{layer.kind === "modelled" ? t("Modelled") : t("Observed")}: {layer.kindReason}</p>
 
                 {layer.gibs && ranges && (
                   <div className="grid grid-cols-[1fr_auto] items-end gap-2">
                     <label className="block">
-                      <span className="mb-0.5 block text-[12px] text-mut">Date</span>
+                      <span className="mb-0.5 block text-[12px] text-mut">{t("Date")}</span>
                       <input type="date" value={value.date ?? ""} min={firstDate(ranges) ?? undefined} max={[lastDate(ranges), todayUTC()].filter(Boolean).sort()[0] ?? undefined}
                         onChange={(e) => pickDate(e.target.value)}
                         className="w-full rounded-ctl border border-line bg-glass-hi px-2 py-1.5 text-sm text-tx [color-scheme:dark] max-sm:min-h-11" />
                     </label>
                     <label className="block w-[110px]">
-                      <span className="mb-0.5 block text-[12px] text-mut">Opacity {Math.round(value.opacity * 100)}%</span>
-                      <input type="range" min={0.2} max={1} step={0.05} value={value.opacity} aria-label="Layer opacity"
+                      <span className="mb-0.5 block text-[12px] text-mut">{t("Opacity {round}%", { round: Math.round(value.opacity * 100) })}</span>
+                      <input type="range" min={0.2} max={1} step={0.05} value={value.opacity} aria-label={t("Layer opacity")}
                         onChange={(e) => onChange({ ...value, opacity: Number(e.target.value) })} />
                     </label>
                   </div>
                 )}
                 {picked && value.date && (
                   <p className="text-[12px] leading-snug text-mut">
-                    No {layer.dataset} data on {formatDate(picked)}; showing the closest earlier date, {formatDate(value.date)}.
+                    {t("No {dataset} data on {formatDate}; showing the closest earlier date, {formatDate2}.", { dataset: layer.dataset, formatDate: formatDate(picked), formatDate2: formatDate(value.date) })}
                   </p>
                 )}
 
                 {layer.gibs && value.date && (
                   <div className="space-y-0.5 text-[12px] leading-snug" role="status">
-                    <p><span className="text-mut">Showing</span> <span className="font-semibold">{formatDayWithAge(value.date)}</span>
-                      {period && <span className="text-mut"> · NASA publishes it {period}</span>}</p>
+                    <p><span className="text-mut">{t("Showing")}</span> <span className="font-semibold">{formatDayWithAge(value.date)}</span>
+                      {period && <span className="text-mut"> {t("· NASA publishes it {period}", { period })}</span>}</p>
                     {latestWithTiles && latestWithTiles !== value.date && (
                       <p className="flex flex-wrap items-center gap-x-2">
-                        <span><span className="text-mut">Latest from NASA</span> {formatDayWithAge(latestWithTiles)}</span>
+                        <span><span className="text-mut">{t("Latest from NASA")}</span> {formatDayWithAge(latestWithTiles)}</span>
                         <button type="button" className="font-semibold text-lime underline-offset-2 hover:underline max-sm:min-h-11"
                           onClick={() => { auto.current = { on: true, tries: 0 }; setPicked(null); onChange({ ...value, date: latestWithTiles }); }}>
-                          Show latest
+                          {t("Show latest")}
                         </button>
                       </p>
                     )}
@@ -360,11 +361,11 @@ export function NasaLayerControl({ value, onChange, style, borders, onBorders, p
                 <StatusLine status={status} layer={layer} date={value.date} />
                 {layer.gibs && layer.pixelKm < 1 && zoom < 10 && (
                   <div className="rounded-[12px] border border-line px-3 py-2 text-[12px] leading-snug" role="note">
-                    <p className="text-tx">Zoom in to see this layer: its {layer.pixelText} pixels are too small to show at this zoom.</p>
+                    <p className="text-tx">{t("Zoom in to see this layer: its {pixelText} pixels are too small to show at this zoom.", { pixelText: layer.pixelText })}</p>
                     {probe && (
                       <button type="button" className={`${btn} mt-1.5`}
                         onClick={() => map.setView(probe.point, 14, { animate: !matchMedia("(prefers-reduced-motion: reduce)").matches })}>
-                        Zoom to {probe.label}
+                        {t("Zoom to")} {t(probe.label)}
                       </button>
                     )}
                   </div>
@@ -372,20 +373,20 @@ export function NasaLayerControl({ value, onChange, style, borders, onBorders, p
                 {status === "ok" && here.state === "empty" && value.date && (
                   <div className="rounded-[12px] border border-line px-3 py-2 text-[12px] leading-snug" role="status">
                     <p className="font-semibold text-tx">
-                      Nothing drawn at {here.where} on {formatDate(value.date)}.
+                      {t("Nothing drawn at {where} on {formatDate}.", { where: here.where, formatDate: formatDate(value.date) })}
                     </p>
                     <p className="text-mut">
-                      {layer.key === "imerg" ? "Under 0.1 mm/hr of rain or no data that day: NASA leaves both clear."
-                        : layer.pixelKm < 0.1 ? "No clear satellite pass here that day (clouds or no overpass)."
-                          : "NASA has no value for this spot on this date (for example, no satellite pass)."}
+                      {layer.key === "imerg" ? t("Under 0.1 mm/hr of rain or no data that day: NASA leaves both clear.")
+                        : layer.pixelKm < 0.1 ? t("No clear satellite pass here that day (clouds or no overpass).")
+                          : t("NASA has no value for this spot on this date (for example, no satellite pass).")}
                     </p>
                     {search.state === "none" ? (
-                      <p className="mt-1 text-mut">No data here in the last 20 dates NASA lists. Try another layer, or pick an earlier date.</p>
+                      <p className="mt-1 text-mut">{t("No data here in the last 20 dates NASA lists. Try another layer, or pick an earlier date.")}</p>
                     ) : (
                       <button type="button" disabled={search.state === "searching"} onClick={() => void findLatestHere()}
                         className={`${btn} mt-1.5`}>
-                        {search.state === "searching" ? <><Loader2 size={13} className="animate-spin" /> Checking earlier dates ({search.checked} of up to 20)…</>
-                          : layer.key === "imerg" ? "Find the latest day with rain here" : "Find the latest date with data here"}
+                        {search.state === "searching" ? <><Loader2 size={13} className="animate-spin" /> {t("Checking earlier dates ({checked} of up to 20)…", { checked: search.checked })}</>
+                          : layer.key === "imerg" ? t("Find the latest day with rain here") : t("Find the latest date with data here")}
                       </button>
                     )}
                   </div>
@@ -393,8 +394,8 @@ export function NasaLayerControl({ value, onChange, style, borders, onBorders, p
 
                 {probe && layer.gibs?.colormap && value.date && !(here.state === "empty" && reading.value?.status === "transparent") && (
                   <div className="rounded-[12px] border border-line px-3 py-2" aria-live="polite">
-                    <p className="text-[12px] text-mut">At {probe.label}, {formatDate(value.date)}</p>
-                    {reading.state === "loading" && <p className="flex items-center gap-1.5 text-[13px] text-mut"><Loader2 size={13} className="animate-spin" /> Reading NASA&apos;s value…</p>}
+                    <p className="text-[12px] text-mut">{t("At")} {t(probe.label)}, {formatDate(value.date)}</p>
+                    {reading.state === "loading" && <p className="flex items-center gap-1.5 text-[13px] text-mut"><Loader2 size={13} className="animate-spin" /> {t("Reading NASA's value…")}</p>}
                     {reading.state === "error" && <p className="text-[13px] text-alert">{reading.error}</p>}
                     {reading.state === "done" && reading.value && (
                       reading.value.status === "class" ? (
@@ -406,49 +407,49 @@ export function NasaLayerControl({ value, onChange, style, borders, onBorders, p
                             </span>
                             <KindTag kind={layer.kind} />
                           </p>
-                          {reading.value.units === "K" && <p className="text-[12px] text-mut">That&apos;s {celsius(reading.value)}.</p>}
+                          {reading.value.units === "K" && <p className="text-[12px] text-mut">{t("That's {celsius}.", { celsius: celsius(reading.value) })}</p>}
                           <p className="mt-0.5 text-[12px] leading-snug text-mut">
-                            NASA&apos;s colour class at this spot (pixel size: {layer.pixelText}), not a measurement of the field itself.
+                            {t("NASA's colour class at this spot (pixel size: {pixelText}), not a measurement of the field itself.", { pixelText: layer.pixelText })}
                           </p>
                         </>
                       ) : (
                         <p className="text-[13px]">
-                          {reading.value.status === "unknown" ? "This colour isn't in NASA's key (it may sit on a class edge or a label)."
-                            : reading.value.status === "nodata" ? "No data here on this date."
-                              : `Nothing drawn here: ${reading.value.label?.toLowerCase() ?? "no data"}.`}
+                          {reading.value.status === "unknown" ? t("This colour isn't in NASA's key (it may sit on a class edge or a label).")
+                            : reading.value.status === "nodata" ? t("No data here on this date.")
+                              : t("Nothing drawn here: {v}.", { v: reading.value.label?.toLowerCase() ?? "no data" })}
                         </p>
                       )
                     )}
                   </div>
                 )}
                 {probe && layer.gibs && !layer.gibs.colormap && (
-                  <p className="text-[12px] text-mut">A natural-colour image has no value scale to read.</p>
+                  <p className="text-[12px] text-mut">{t("A natural-colour image has no value scale to read.")}</p>
                 )}
                 {!probe && layer.gibs?.colormap && (
-                  <p className="text-[12px] text-mut">Select a field to read this layer&apos;s value there.</p>
+                  <p className="text-[12px] text-mut">{t("Select a field to read this layer's value there.")}</p>
                 )}
 
                 {layer.gibs?.legend && (
                   <figure>
                     {/* NASA's own colour key; light backing because the key's text is dark. */}
-                    <img src={layer.gibs.legend} alt={`Colour key for ${layer.label}, in ${layer.units}, from NASA GIBS`}
+                    <img src={layer.gibs.legend} alt={t("Colour key for {label}, in {units}, from NASA GIBS", { label: layer.label, units: layer.units })}
                       className="w-full rounded-chip bg-tx p-1" />
-                    <figcaption className="mt-1 text-[12px] text-mut">Colour key: NASA GIBS</figcaption>
+                    <figcaption className="mt-1 text-[12px] text-mut">{t("Colour key: NASA GIBS")}</figcaption>
                   </figure>
                 )}
                 <p className="text-[12px] leading-snug text-tx">{scaleNote(layer)}</p>
-                {layer.note && <p className="text-[12px] leading-snug text-mut">{layer.note}</p>}
+                {layer.note && <p className="text-[12px] leading-snug text-mut">{t(layer.note)}</p>}
 
                 <div className="flex flex-wrap gap-1.5">
                   {layer.gibs && (
                     <a className={btn} target="_blank" rel="noreferrer"
                       href={worldviewUrl(layer.gibs.id, value.date ?? undefined, {
                         west: bounds.getWest(), south: bounds.getSouth(), east: bounds.getEast(), north: bounds.getNorth() })}>
-                      <ExternalLink size={14} strokeWidth={1.75} /> Open in NASA Worldview
+                      <ExternalLink size={14} strokeWidth={1.75} /> {t("Open in NASA Worldview")}
                     </a>
                   )}
                   <a className={btn} target="_blank" rel="noreferrer" href={earthdataSearchUrl(layer.product.conceptId)}>
-                    <ExternalLink size={14} strokeWidth={1.75} /> Earthdata Search
+                    <ExternalLink size={14} strokeWidth={1.75} /> {t("Earthdata Search")}
                   </a>
                 </div>
               </div>
@@ -473,10 +474,10 @@ function LayerOption({ on, onClick, title, sub }: { on: boolean; onClick: () => 
 
 function StatusLine({ status, layer, date }: { status: Status; layer: NasaLayer; date: string | null }) {
   if (status === "dates" || status === "loading") {
-    return <p className="flex items-center gap-1.5 text-[12px] text-mut" role="status"><Loader2 size={13} className="animate-spin" /> Loading NASA layer…</p>;
+    return <p className="flex items-center gap-1.5 text-[12px] text-mut" role="status"><Loader2 size={13} className="animate-spin" /> {t("Loading NASA layer…")}</p>;
   }
-  const problem = status === "offline" ? "Couldn't reach NASA GIBS. Check your connection, then pick the layer again."
-    : status === "empty" && date ? `No ${layer.dataset} data for ${formatDate(date)} here. Try an earlier date.` : null;
+  const problem = status === "offline" ? t("Couldn't reach NASA GIBS. Check your connection, then pick the layer again.")
+    : status === "empty" && date ? t("No {dataset} data for {formatDate} here. Try an earlier date.", { dataset: layer.dataset, formatDate: formatDate(date) }) : null;
   return problem ? (
     <p role="alert" className="flex gap-1.5 text-[12px] font-semibold leading-snug text-alert">
       <AlertTriangle size={13} strokeWidth={2} className="mt-px shrink-0" /> {problem}

@@ -7,6 +7,7 @@ import L from "leaflet";
 import { Loader2, MapPin, Search, Sprout, Tractor, X } from "lucide-react";
 import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import type { LatLng } from "./BoundaryDraw";
+import { t } from "../i18n";
 
 /** One thing the search can jump to. `bounds` is [[south, west], [north, east]]. */
 export interface SearchResult {
@@ -63,7 +64,7 @@ export function MapSearch({ local, searchPlaces, onPick, style }: {
   const text = q.trim().toLowerCase();
   const coords = parseCoordinates(q);
   const results: SearchResult[] = [
-    ...(coords ? [{ id: "coords", kind: "coordinates" as const, title: `${coords[0]}, ${coords[1]}`, subtitle: "Coordinates", point: coords }] : []),
+    ...(coords ? [{ id: "coords", kind: "coordinates" as const, title: `${coords[0]}, ${coords[1]}`, subtitle: t("Coordinates"), point: coords }] : []),
     ...(text.length >= 1 ? local.filter((r) => r.title.toLowerCase().includes(text)).slice(0, 6) : []),
     ...(placesFor === q.trim() && places ? places.results : []),
   ];
@@ -124,14 +125,14 @@ export function MapSearch({ local, searchPlaces, onPick, style }: {
       <div className="glass flex items-center gap-2 !rounded-[13px] px-3">
         {status === "searching" ? <Loader2 size={16} className="shrink-0 animate-spin text-mut" />
           : <Search size={16} strokeWidth={1.75} className="shrink-0 text-mut" />}
-        <input type="search" role="combobox" aria-expanded={!!showList} aria-controls={listId} aria-label="Search places, farms, fields or coordinates"
+        <input type="search" role="combobox" aria-expanded={!!showList} aria-controls={listId} aria-label={t("Search places, farms, fields or coordinates")}
           aria-activedescendant={showList && results[active] ? `${listId}-${active}` : undefined}
-          placeholder="Search a place, farm, field or lat, lon" value={q}
+          placeholder={t("Search a place, farm, field or lat, lon")} value={q}
           onChange={(e) => { setQ(e.target.value); setActive(-1); setOpen(true); setProblem(null); setStatus("idle"); }}
           onFocus={() => setOpen(true)} onKeyDown={onKey}
           className="min-h-11 w-full bg-transparent text-sm text-tx placeholder:text-mut/80 focus:outline-none [&::-webkit-search-cancel-button]:hidden" />
         {q && (
-          <button type="button" aria-label="Clear search" onClick={() => { setQ(""); setPlaces(null); setPlacesFor(null); setProblem(null); }}
+          <button type="button" aria-label={t("Clear search")} onClick={() => { setQ(""); setPlaces(null); setPlacesFor(null); setProblem(null); }}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-ctl text-mut hover:bg-glass-hi hover:text-tx max-sm:h-11 max-sm:w-11">
             <X size={15} strokeWidth={1.75} />
           </button>
@@ -141,7 +142,7 @@ export function MapSearch({ local, searchPlaces, onPick, style }: {
       {showList && (
         <div className="glass mt-1.5 overflow-hidden !rounded-[13px]">
           {results.length > 0 && (
-            <ul id={listId} role="listbox" aria-label="Search results" className="scroll-thin max-h-[300px] overflow-y-auto p-1">
+            <ul id={listId} role="listbox" aria-label={t("Search results")} className="scroll-thin max-h-[300px] overflow-y-auto p-1">
               {results.map((r, i) => {
                 const Icon = ICON[r.kind];
                 return (
@@ -150,7 +151,7 @@ export function MapSearch({ local, searchPlaces, onPick, style }: {
                     className={`flex min-h-11 cursor-pointer items-start gap-2 rounded-[10px] px-2.5 py-2 ${i === active ? "bg-glass-sel" : ""}`}>
                     <Icon size={15} strokeWidth={1.75} className="mt-0.5 shrink-0 text-mut" />
                     <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-semibold">{r.title}</span>
+                      <span className="block truncate text-[13px] font-semibold">{t(r.title)}</span>
                       {r.subtitle && <span className="block truncate text-[12px] text-mut">{r.subtitle}</span>}
                     </span>
                   </li>
@@ -159,11 +160,11 @@ export function MapSearch({ local, searchPlaces, onPick, style }: {
             </ul>
           )}
           <div className="border-t border-line px-3 py-2 text-[12px] leading-snug text-mut" aria-live="polite">
-            {status === "searching" ? "Searching places…"
+            {status === "searching" ? t("Searching places…")
               : problem ? <span className="text-alert">{problem}</span>
-                : searchedNothing ? "No places found. Check the spelling, or type coordinates like 42.03, -93.46."
-                  : placesFor === q.trim() && places ? `Places: ${places.attribution}`
-                    : !coords && q.trim().length >= 2 ? "Press Enter to search place names." : "Your farms and fields match as you type."}
+                : searchedNothing ? t("No places found. Check the spelling, or type coordinates like 42.03, -93.46.")
+                  : placesFor === q.trim() && places ? t("Places: {attribution}", { attribution: places.attribution })
+                    : !coords && q.trim().length >= 2 ? t("Press Enter to search place names.") : t("Your farms and fields match as you type.")}
           </div>
         </div>
       )}

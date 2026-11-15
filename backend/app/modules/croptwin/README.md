@@ -20,7 +20,8 @@ Depends on: `shared` only.
 
 ## Status
 
-Built as part of the platform base; the CropTwin owner should review the schema.
+Farm profile API and UI are built on `main` (merged from `croptwin/farm-profile`). See `docs/modules/croptwin.md`
+and the merge guide `docs/modules/croptwin_handoff.md`.
 
 - Tables and conventions: `docs/architecture.md`, "Database".
 - `geometry.py` computes area and centroid from the GeoJSON boundary.

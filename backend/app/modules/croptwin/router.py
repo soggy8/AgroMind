@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from app.shared.db import get_session
 
 from . import colour_classes, places, service
-from .schemas import (CropHistoryIn, FarmCreate, FarmOut, FarmSummary, FarmUpdate, FieldCreate, FieldOut,
+from .advisor import advisor_context
+from .schemas import (AdvisorContext, CropHistoryIn, FarmCreate, FarmOut, FarmSummary, FarmUpdate, FieldCreate, FieldOut,
                       FieldUpdate, PlaceSearch, SoilLayerIn, ColourReading, WeatherOut)
 
 router = APIRouter(prefix="/api/farms", tags=["croptwin"])
@@ -75,6 +76,12 @@ def create_farm(body: FarmCreate, session: Session = DB):
 @router.get("/{farm_id}", response_model=FarmOut)
 def get_farm(farm_id: str, session: Session = DB):
     return _call(service.get_farm, session, farm_id)
+
+
+@router.get("/{farm_id}/advisor-context", response_model=AdvisorContext)
+def get_advisor_context(farm_id: str, session: Session = DB):
+    """The facts the AI advisor may use about this farm's profile."""
+    return advisor_context(_call(service.get_farm, session, farm_id))
 
 
 @router.patch("/{farm_id}", response_model=FarmOut)

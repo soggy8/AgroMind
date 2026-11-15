@@ -5,27 +5,32 @@ Frontend (React)  ──►  FastAPI
                          ├── modules/croptwin    farm profile (source of truth)
                          ├── modules/cropdoctor  observations → anomalies → explanations
                          ├── modules/simulator   rotations × scenarios → ranked outcomes
+                         ├── modules/assistant   NL chat; drives UI + cites module facts
                          └── shared/
-                              ├── connectors     NASA POWER, SMAP, MODIS, Landsat, GPM, SoilGrids
-                              ├── db             PostgreSQL + PostGIS
-                              └── advisor        LLM explanations grounded in module outputs
+                              ├── connectors     NASA POWER, SMAP, MODIS, Landsat, GPM, SoilGrids (planned)
+                              ├── db             PostgreSQL + PostGIS (SQLite in dev)
+                              └── advisor/       LLM client, grounding (assistant + advisor routes)
 ```
 
 ## Data flow
 
-1. User creates a farm (CropTwin) → location, boundary, soil, crops, priorities stored.
-2. CropDoctor pulls indicators via connectors, compares with baselines, emits anomalies + cautious explanations.
-3. Simulator takes the farm + rotations + scenario, runs the engine per season, ranks by priorities.
-4. Advisor receives CropDoctor / Simulator outputs and explains them; it never fabricates values.
+1. User creates a farm (CropTwin) → location, field boundaries, soil, crop history, priorities stored.
+2. CropDoctor reads the farm via CropTwin, loads committed NASA samples (and live POWER for “today”),
+   compares indicators with baselines, emits cautious findings.
+3. Simulator reads the same farm through CropTwin, takes rotations + scenario, runs the engine, ranks by priorities.
+4. The **assistant** calls module `service.py` and each module's `advisor.py` fact builders. It may navigate the UI
+   and propose farm edits; answers cite numbered facts only. Standalone **advisor** routes remain for module-local
+   “explain this payload” calls.
 
-## API surface (draft)
+## API surface
 
 | Module | Prefix |
 |---|---|
 | CropTwin | `/api/farms` |
-| CropDoctor | `/api/farms/{farm_id}/health` |
+| CropDoctor | `/api/farms/{farm_id}/health` (and related field endpoints) |
 | Simulator | `/api/farms/{farm_id}/simulations` |
-| Advisor | `/api/advisor` |
+| Assistant | `/api/farms/{farm_id}/assistant/chat` (NDJSON stream) |
+| Advisor | `/api/advisor` (grounded explain; module-specific handlers) |
 
 ## Backend platform
 
@@ -70,8 +75,13 @@ Conventions:
 - **Alembic manages only our tables.** `migrations/env.py` ignores the PostGIS image's own
   tables (TIGER geocoder, topology), which autogenerate would otherwise try to drop.
 
-Not in the database yet:
+Not in the database:
 
-- Simulator saved runs: JSON files via `simulator/store.py` (swap planned behind the same four functions).
-- Weather: NASA POWER responses cached as files under `data/cache/`.
-- CropDoctor observations and baselines: no tables until that module starts.
+- CropDoctor indicators and baselines: computed from committed sample files in `data/samples/` on each request;
+  no observation tables yet.
+- Weather and imagery caches: optional files under `data/cache/` when live connectors are added.
+
+In the database:
+
+- Simulator **saved runs** (`simulation_runs` table): request + result JSON, scoped per farm. Accessed via
+  `simulator/store.py` and the same service functions whether the backend uses SQLite or PostgreSQL.

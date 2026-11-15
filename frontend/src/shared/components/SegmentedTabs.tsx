@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { t } from "../i18n";
 
 export interface Segment<T extends string> {
   id: T;
@@ -32,7 +33,7 @@ export function SegmentedTabs<T extends string>({
               on ? "bg-glass-sel text-tx shadow-[inset_0_1px_0_rgb(255_255_255/.15)]" : "text-mut hover:text-tx"
             }`}
           >
-            {it.label}
+            {typeof it.label === "string" ? t(it.label) : it.label}
           </button>
         );
       })}

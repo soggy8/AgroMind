@@ -8,4 +8,5 @@ export { InfoTip } from "./InfoTip";
 export { KindTag, type ValueKind } from "./KindTag";
 export { SegmentedTabs, type Segment } from "./SegmentedTabs";
 export { Skeleton } from "./Skeleton";
+export { StatusPill } from "./StatusPill";
 export { Tour, tourSeen, type TourStep } from "./Tour";

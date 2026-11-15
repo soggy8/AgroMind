@@ -26,6 +26,27 @@ async function toSetup(page: Page) {
   if (isPhone(page)) await page.getByRole("tab", { name: "Set up" }).click();
 }
 
+/** Units sit in the top bar: inline on very wide screens, behind "Display settings" or the phone menu otherwise. */
+async function setUnits(page: Page, label: "US" | "Metric") {
+  const bar = page.getByRole("banner");
+  const tab = bar.getByRole("tab", { name: label, exact: true });
+  if (!(await tab.isVisible())) {
+    const settings = bar.getByLabel("Display settings");
+    await ((await settings.isVisible()) ? settings : bar.getByLabel("Menu")).click();
+  }
+  await tab.click();
+  await page.keyboard.press("Escape");
+}
+
+// Saved runs live in the shared dev database: whatever a test saves is removed afterwards, even if it fails midway.
+const saved: string[] = [];
+test.afterEach(async ({ request }) => {
+  if (!saved.length) return;
+  const runs = (await (await request.get("/api/farms/demo/simulations")).json()) as { id: string; name: string }[];
+  for (const r of runs.filter((x) => saved.includes(x.name))) await request.delete(`/api/farms/demo/simulations/${r.id}`);
+  saved.length = 0;
+});
+
 test("loads the demo farm and runs a hotter, drier scenario", async ({ page }) => {
   const errors = await open(page);
   for (const name of ["North Field", "Creek Field", "West Field"]) {
@@ -75,6 +96,7 @@ test("saves, lists and deletes a run", async ({ page }) => {
   await run(page);
   await page.getByRole("tab", { name: "Saved" }).click();
   const name = `E2E run ${Date.now()}`;
+  saved.push(name);
   await page.getByLabel("Name for this run").fill(name);
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText(name)).toBeVisible();
@@ -151,21 +173,10 @@ test("irrigation planner explains what water can and can't fix", async ({ page }
 
 test("US units convert areas and water", async ({ page }) => {
   await open(page);
-  if (isPhone(page)) await page.getByRole("region", { name: "Simulation" }).getByRole("tab", { name: "US", exact: true }).click();
-  else await page.getByRole("banner").getByRole("tab", { name: "US", exact: true }).click();
+  await setUnits(page, "US");
   await expect(page.getByRole("radio", { name: /North Field/ })).toContainText(" ac");
   await run(page);
   await expect(page.getByText(" in", { exact: false }).first()).toBeVisible();
-});
-
-test("advisor explains it isn't configured instead of failing silently", async ({ page }) => {
-  await open(page);
-  await run(page);
-  await page.getByRole("button", { name: "Ask the advisor" }).click();
-  const drawer = page.getByRole("dialog", { name: "Ask the advisor" });
-  await drawer.getByRole("button", { name: /rank first/ }).click();
-  // With an API key this shows an answer; without one the server says how to configure it.
-  await expect(drawer.getByText(/ANTHROPIC_API_KEY|Based on facts/)).toBeVisible({ timeout: 60_000 });
 });
 
 test("saved runs can be compared side by side", async ({ page }) => {
@@ -174,6 +185,7 @@ test("saved runs can be compared side by side", async ({ page }) => {
   await page.getByRole("tab", { name: "Saved" }).click();
   const a = `E2E A ${Date.now()}`;
   const b = `E2E B ${Date.now()}`;
+  saved.push(a, b);
   for (const name of [a, b]) {
     await page.getByLabel("Name for this run").fill(name);
     await page.getByRole("button", { name: "Save", exact: true }).click();

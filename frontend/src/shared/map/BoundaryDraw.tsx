@@ -7,6 +7,7 @@ import L from "leaflet";
 import { AlertTriangle, Check, Crosshair, RotateCcw, Undo2, X } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef } from "react";
 import { Marker, Polygon, Polyline, useMap, useMapEvents } from "react-leaflet";
+import { t as tr } from "../i18n";
 
 /** (latitude, longitude), the order Leaflet uses. */
 export type LatLng = [number, number];
@@ -166,7 +167,7 @@ export function BoundaryDraw({ points, closed, onChange, onDone, onCancel, toolb
       )}
       {points.map((p, i) => (
         <Marker key={i} position={p} icon={vertexIcon(i === 0, canClose && !closed)} draggable={closed}
-          keyboard={false} title={i === 0 && !closed && canClose ? "Close the shape" : `Corner ${i + 1}`}
+          keyboard={false} title={i === 0 && !closed && canClose ? tr("Close the shape") : tr("Corner {v}", { v: i + 1 })}
           eventHandlers={{
             click: (e) => {
               L.DomEvent.stopPropagation(e);
@@ -182,7 +183,7 @@ export function BoundaryDraw({ points, closed, onChange, onDone, onCancel, toolb
         </div>
       )}
 
-      <div ref={toolbar} role="toolbar" aria-label="Boundary drawing"
+      <div ref={toolbar} role="toolbar" aria-label={tr("Boundary drawing")}
         className="glass absolute z-[500] max-w-[calc(100%-32px)] !rounded-[14px] p-1.5"
         style={toolbarStyle ?? { left: 16, top: 16 }}>
         {/* Buttons on their own row, first, so they never shift when the status text below changes length. */}
@@ -190,48 +191,48 @@ export function BoundaryDraw({ points, closed, onChange, onDone, onCancel, toolb
           {closed ? (
             <>
               <button type="button" className={btn} onClick={onDone}>
-                <Check size={15} strokeWidth={1.75} /> Done
+                <Check size={15} strokeWidth={1.75} /> {tr("Done")}
               </button>
               <button type="button" className={btn} onClick={() => onChange([], false)}>
-                <RotateCcw size={15} strokeWidth={1.75} /> Redraw
+                <RotateCcw size={15} strokeWidth={1.75} /> {tr("Redraw")}
               </button>
             </>
           ) : (
             <>
               <button type="button" className={btn} onClick={() => onChange(points, true)} disabled={!canClose}>
-                <Check size={15} strokeWidth={1.75} /> Close shape
+                <Check size={15} strokeWidth={1.75} /> {tr("Close shape")}
               </button>
               <button type="button" className={btn} onClick={() => onChange(points.slice(0, -1), false)} disabled={!points.length}>
-                <Undo2 size={15} strokeWidth={1.75} /> Undo
+                <Undo2 size={15} strokeWidth={1.75} /> {tr("Undo")}
               </button>
-              <button type="button" className={btn} onClick={addAtCentre} title="Add a corner at the crosshair">
-                <Crosshair size={15} strokeWidth={1.75} /> Add corner
+              <button type="button" className={btn} onClick={addAtCentre} title={tr("Add a corner at the crosshair")}>
+                <Crosshair size={15} strokeWidth={1.75} /> {tr("Add corner")}
               </button>
             </>
           )}
           <button type="button" className={btn} onClick={onCancel}>
-            <X size={15} strokeWidth={1.75} /> Cancel
+            <X size={15} strokeWidth={1.75} /> {tr("Cancel")}
           </button>
         </div>
         <div className="px-1.5 pb-0.5 pt-1.5" aria-live="polite">
           <span className="block text-[13px] font-semibold">
             {closed
-              ? "Drag the corners to adjust"
+              ? tr("Drag the corners to adjust")
               : points.length === 0
-                ? "Click the map to place the first corner"
-                : `${points.length} corner${points.length === 1 ? "" : "s"}${canClose ? " · click the first one to close" : ""}`}
+                ? tr("Click the map to place the first corner")
+                : (points.length === 1 ? tr("{n} corner", { n: 1 }) : tr("{n} corners", { n: points.length })) + (canClose ? tr(" · click the first one to close") : "")}
           </span>
           <span className="block text-[12px] text-mut">
-            {closed ? "Esc to cancel" : "Enter to close · Backspace to undo · Esc to cancel"}
+            {closed ? tr("Esc to cancel") : tr("Enter to close · Backspace to undo · Esc to cancel")}
           </span>
           {crossing && (
             <span role="alert" className="mt-0.5 flex items-center gap-1 text-[12px] font-semibold text-alert">
-              <AlertTriangle size={13} strokeWidth={2} /> Edges cross. Drag a corner or redraw.
+              <AlertTriangle size={13} strokeWidth={2} /> {tr("Edges cross. Drag a corner or redraw.")}
             </span>
           )}
           {overlapping.length > 0 && (
             <span role="alert" className="mt-0.5 flex items-center gap-1 text-[12px] font-semibold text-alert">
-              <AlertTriangle size={13} strokeWidth={2} className="shrink-0" /> Overlaps {listNames(overlapping)}. Fields can share an edge, not area.
+              <AlertTriangle size={13} strokeWidth={2} className="shrink-0" /> {tr("Overlaps {listNames}. Fields can share an edge, not area.", { listNames: listNames(overlapping) })}
             </span>
           )}
         </div>

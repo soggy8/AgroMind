@@ -1,10 +1,12 @@
+import type { Units } from "../../../shared/units";
 import type { Value } from "../types";
+import { formatDate, t } from "../../../shared/i18n";
 
 const minus = "−";
 
-const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-const dayMonthFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-const monthFmt = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
+const dateFmt = { format: (d: Date) => formatDate(d, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) };
+const dayMonthFmt = { format: (d: Date) => formatDate(d, { day: "numeric", month: "short", timeZone: "UTC" }) };
+const monthFmt = { format: (d: Date) => formatDate(d, { month: "short", timeZone: "UTC" }) };
 
 const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
@@ -30,19 +32,24 @@ export function signed(x: number, digits = 0): string {
 
 export const ndvi = (x: number) => x.toFixed(2);
 
-/** A value with its unit: "54 mm", "35.1 °C", "6.4 mm/day", NDVI "0.76". */
-export function fmtValue(v: Value): string {
+/**
+ * A value with its unit: "54 mm", "35.1 °C", "6.4 mm/d", NDVI "0.76". With `u` (the shared Metric/US setting) water
+ * and temperature follow the user's units: "2.1 in", "95.1 °F", "0.25 in/d". The API always speaks metric.
+ */
+export function fmtValue(v: Value, u?: Units): string {
   if (v.value === null) return "–";
   if (v.unit === "") return ndvi(v.value);
-  if (v.unit === "mm") return `${Math.round(v.value)} mm`;
-  return `${v.value.toFixed(1)} ${v.unit === "mm/day" ? "mm/d" : v.unit}`;
+  if (v.unit === "mm") return u ? u.water(v.value) : `${Math.round(v.value)} mm`;
+  if (v.unit === "°C" && u) return u.temp(v.value);
+  if (v.unit === "mm/day") return u?.system === "us" ? `${(v.value / 25.4).toFixed(2)} in/d` : `${v.value.toFixed(1)} mm/d`;
+  return `${v.value.toFixed(1)} ${v.unit}`;
 }
 
-/** "−8%", "+5.2 °C", or with `vsNormal` "−8% vs normal"; undefined when there is no comparison. */
-export function fmtDiff(v: Value, vsNormal = false): string | undefined {
+/** "−8%", "+5.2 °C" (or "+9.4 °F" with US units), or with `vsNormal` "−8% vs normal"; undefined when there is no comparison. */
+export function fmtDiff(v: Value, vsNormal = false, u?: Units): string | undefined {
   if (v.diff === null || v.diff_unit === null) return undefined;
-  const d = v.diff_unit === "%" ? `${signed(v.diff)}%` : `${signed(v.diff, 1)} ${v.diff_unit}`;
-  return vsNormal ? `${d} vs normal` : d;
+  const d = v.diff_unit === "%" ? `${signed(v.diff)}%` : u && v.diff_unit === "°C" ? u.tempDelta(v.diff) : `${signed(v.diff, 1)} ${v.diff_unit}`;
+  return vsNormal ? t("{d} vs normal", { d }) : d;
 }
 
 /** value / normal for the vs-normal bar, or null. */
@@ -60,4 +67,4 @@ export function shortSource(source: string): string {
   return cut > 0 ? source.slice(0, cut) : source;
 }
 
-export const fmtArea = (ha: number) => `${ha.toFixed(1)} ha`;
+export const fmtArea = (ha: number, u?: Units) => (u ? u.area(ha) : `${ha.toFixed(1)} ha`);

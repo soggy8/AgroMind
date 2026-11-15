@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
+import { t } from "../shared/i18n";
 
-export type Route = "command-center" | "simulator" | "farm-profile";
-export const ROUTES: { id: Route; label: string }[] = [
-  { id: "command-center", label: "Command Center" },
-  { id: "simulator", label: "Simulator" },
-  { id: "farm-profile", label: "Farm profile" },
+/** "home" is the landing page; it is not one of the app tabs in ROUTES. */
+export type Route = "home" | AppRoute;
+export type AppRoute = "overview" | "command-center" | "simulator" | "farm-profile";
+export const ROUTES: { id: AppRoute; label: string }[] = [
+  { id: "overview", label: t("Overview") },
+  { id: "command-center", label: t("Command Center") },
+  { id: "simulator", label: t("Simulator") },
+  { id: "farm-profile", label: t("Farm profile") },
 ];
 
-const DEFAULT: Route = "simulator";
+const DEFAULT: Route = "home";
 
 function parse(): Route {
   const id = window.location.hash.replace(/^#\/?/, "");
@@ -23,7 +27,8 @@ export function useRoute(): [Route, (r: Route) => void] {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
   const navigate = useCallback((r: Route) => {
-    window.location.hash = `/${r}`;
+    window.location.hash = r === "home" ? "/" : `/${r}`;
+    window.scrollTo(0, 0);
   }, []);
   return [route, navigate];
 }

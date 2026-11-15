@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 /**
  * CropTwin API contract. Mirrors backend/app/modules/croptwin/schemas.py: change both together.
  */
@@ -5,25 +6,25 @@
 /** The crops the Simulator models. Must equal CropId in schemas.py and the keys of simulator.parameters.CROPS
  * (three copies, recorded in docs/modules/croptwin.md). */
 export const CROPS = [
-  { id: "maize", name: "Maize" },
-  { id: "soybean", name: "Soybean" },
-  { id: "oats", name: "Oats" },
-  { id: "winter_wheat", name: "Winter wheat" },
-  { id: "sunflower", name: "Sunflower" },
+  { id: "maize", name: t("Maize") },
+  { id: "soybean", name: t("Soybean") },
+  { id: "oats", name: t("Oats") },
+  { id: "winter_wheat", name: t("Winter wheat") },
+  { id: "sunflower", name: t("Sunflower") },
 ] as const;
 export type CropId = (typeof CROPS)[number]["id"];
 
 /** FAO-56 Table 19 texture classes (SoilTexture in schemas.py). */
 export const SOIL_TEXTURES = [
-  { id: "sand", name: "Sand" },
-  { id: "loamy_sand", name: "Loamy sand" },
-  { id: "sandy_loam", name: "Sandy loam" },
-  { id: "loam", name: "Loam" },
-  { id: "silt_loam", name: "Silt loam" },
-  { id: "silt", name: "Silt" },
-  { id: "silty_clay_loam", name: "Silty clay loam" },
-  { id: "silty_clay", name: "Silty clay" },
-  { id: "clay", name: "Clay" },
+  { id: "sand", name: t("Sand") },
+  { id: "loamy_sand", name: t("Loamy sand") },
+  { id: "sandy_loam", name: t("Sandy loam") },
+  { id: "loam", name: t("Loam") },
+  { id: "silt_loam", name: t("Silt loam") },
+  { id: "silt", name: t("Silt") },
+  { id: "silty_clay_loam", name: t("Silty clay loam") },
+  { id: "silty_clay", name: t("Silty clay") },
+  { id: "clay", name: t("Clay") },
 ] as const;
 export type SoilTexture = (typeof SOIL_TEXTURES)[number]["id"];
 
@@ -205,4 +206,11 @@ export interface FarmSummary {
   name: string;
   region: string | null;
   field_count: number;
+}
+
+/** What the AI advisor may use (backend schemas.py AdvisorContext): numbered facts, house rules, starter questions. */
+export interface AdvisorContext {
+  instructions: string;
+  facts: string[];
+  suggested_questions: string[];
 }

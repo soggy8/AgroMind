@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 export type ValueKind = "observed" | "modelled" | "scenario";
 
 const hue: Record<ValueKind, string> = {
@@ -7,10 +8,12 @@ const hue: Record<ValueKind, string> = {
 };
 
 /** Every value's label: OBSERVED / MODELLED / SCENARIO (DESIGN.md sections 6 and 8). */
+const KIND_LABEL: Record<ValueKind, string> = { observed: "OBSERVED", modelled: "MODELLED", scenario: "SCENARIO" };
+
 export function KindTag({ kind, className = "" }: { kind: ValueKind; className?: string }) {
   return (
     <span className={`inline-block rounded-[6px] border px-[7px] py-[2px] text-[11.5px] font-extrabold uppercase tracking-[.05em] ${hue[kind]} ${className}`}>
-      {kind}
+      {t(KIND_LABEL[kind])}
     </span>
   );
 }

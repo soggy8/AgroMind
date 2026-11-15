@@ -1,4 +1,6 @@
 /** Minimal JSON client for the AgroMind API. Paths start with /api (proxied by Vite in dev). */
+import { acceptLanguage } from "../i18n";
+import { t } from "../i18n";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -12,12 +14,13 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
     res = await fetch(path, {
       method,
       signal,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      // The backend translates its own sentences to the language asked for (backend/app/shared/i18n.py).
+      headers: { "Accept-Language": acceptLanguage(), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
-    throw new ApiError(0, "Couldn't reach the AgroMind server. Check that the backend is running.");
+    throw new ApiError(0, t("Couldn't reach the AgroMind server. Check that the backend is running."));
   }
   if (!res.ok) {
     let detail = res.statusText;

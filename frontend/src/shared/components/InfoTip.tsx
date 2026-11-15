@@ -1,5 +1,6 @@
 import { Info } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { t } from "../i18n";
 
 /** A small (i) button that explains a term in plain words. Click or keyboard to open; Esc or outside click closes. */
 export function InfoTip({ label, children, align = "left" }: { label: string; children: ReactNode; align?: "left" | "right" }) {
@@ -20,7 +21,7 @@ export function InfoTip({ label, children, align = "left" }: { label: string; ch
   }, [open]);
   return (
     <span ref={ref} className="relative inline-flex align-middle">
-      <button type="button" aria-label={`What is ${label}?`} aria-expanded={open} aria-controls={id}
+      <button type="button" aria-label={t("What is {label}?", { label })} aria-expanded={open} aria-controls={id}
         onClick={() => setOpen((o) => !o)}
         className="grid h-6 w-6 place-items-center rounded-full text-mut hover:bg-glass-hi hover:text-tx">
         <Info size={14} strokeWidth={1.75} />

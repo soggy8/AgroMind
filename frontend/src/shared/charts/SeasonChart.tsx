@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { t as tr } from "../i18n";
 
 export interface SeasonChartPoint {
   x: number;
@@ -18,7 +19,7 @@ const fmt = (v: unknown) => (typeof v === "number" ? v.toFixed(2) : Array.isArra
  * in the comparison hues, the normal as a band and dashed line, and an optional dashed amber marker.
  * `ticks` places the x-axis labels; without it Recharts picks them.
  */
-export function SeasonChart({ points, years, marker, ariaLabel, ticks, normalLabel = "Normal" }: {
+export function SeasonChart({ points, years, marker, ariaLabel, ticks, normalLabel = tr("Normal") }: {
   points: SeasonChartPoint[];
   years: [string, string, string];
   marker?: { x: number; label: string };
@@ -40,7 +41,7 @@ export function SeasonChart({ points, years, marker, ariaLabel, ticks, normalLab
     <div>
       <ul aria-hidden className="m-0 mb-1 mt-2 flex list-none flex-wrap gap-x-3.5 gap-y-1 p-0 text-[12px] text-mut">
         {legend.map((l) => (
-          <li key={l.label} className="flex items-center gap-1.5"><b className={`inline-block h-[3px] w-3 rounded-[2px] ${l.cls}`} />{l.label}</li>
+          <li key={l.label} className="flex items-center gap-1.5"><b className={`inline-block h-[3px] w-3 rounded-[2px] ${l.cls}`} />{tr(l.label)}</li>
         ))}
       </ul>
       <div className="h-[210px]" role="img" aria-label={ariaLabel}>

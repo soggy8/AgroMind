@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_ROOT.parent
@@ -25,11 +26,18 @@ class Settings(BaseSettings):
     database_url: str = Field(f"sqlite:///{VAR_DIR / 'agromind.db'}", alias="DATABASE_URL")
     database_echo: bool = Field(False, alias="DATABASE_ECHO")
 
-    cors_origins: list[str] = Field(["http://localhost:5173", "http://127.0.0.1:5173"], alias="AGROMIND_CORS_ORIGINS")
+    # NoDecode: the value is comma-separated (see .env.example), not JSON; _split_csv parses it.
+    cors_origins: Annotated[list[str], NoDecode] = Field(["http://localhost:5173", "http://127.0.0.1:5173"], alias="AGROMIND_CORS_ORIGINS")
 
     earthdata_username: str = Field("", alias="EARTHDATA_USERNAME")
     earthdata_password: str = Field("", alias="EARTHDATA_PASSWORD")
+    # AI advisor (shared/advisor/client.py). Provider is guessed from the key when LLM_PROVIDER is unset.
     llm_api_key: str = Field("", alias="LLM_API_KEY")
+    llm_provider: str = Field("", alias="LLM_PROVIDER")            # groq | gemini | openrouter | anthropic
+    llm_model: str = Field("", alias="LLM_MODEL")                  # empty: the provider's default
+    llm_spare_model: str = Field("", alias="LLM_SPARE_MODEL")      # used when the main model's quota runs out
+    llm_base_url: str = Field("", alias="LLM_BASE_URL")            # any OpenAI-compatible API
+    llm_reasoning_effort: str = Field("low", alias="LLM_REASONING_EFFORT")  # empty for models without it
 
     @field_validator("database_url")
     @classmethod

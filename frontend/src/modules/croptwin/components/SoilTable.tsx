@@ -14,12 +14,13 @@ import { ActionError } from "./ActionError";
 import { useConfirm } from "./ConfirmDialog";
 import { inputCls, metaCls, sectionTitle } from "./form";
 import { formatDayWithAge, formatTimestamp } from "../../../shared/map/dates";
+import { t } from "../../../shared/i18n";
 
 type NumKey = "sand_pct" | "silt_pct" | "clay_pct" | "soc_g_kg" | "ph";
 const COLS: { key: NumKey; label: string; unit: string; max: number }[] = [
-  { key: "sand_pct", label: "Sand", unit: "%", max: 100 },
-  { key: "silt_pct", label: "Silt", unit: "%", max: 100 },
-  { key: "clay_pct", label: "Clay", unit: "%", max: 100 },
+  { key: "sand_pct", label: t("Sand"), unit: "%", max: 100 },
+  { key: "silt_pct", label: t("Silt"), unit: "%", max: 100 },
+  { key: "clay_pct", label: t("Clay"), unit: "%", max: 100 },
   { key: "soc_g_kg", label: "SOC", unit: "g/kg", max: 1000 },
   { key: "ph", label: "pH", unit: "", max: 14 },
 ];
@@ -29,7 +30,7 @@ const fmt = (v: number | null) => (v === null ? null : v.toFixed(1));
 
 /** SoilGrids layers carry the day SoilGrids was queried (UTC); farmer layers the moment they were entered (local). */
 const sourceDate = (instant: string | undefined, modelled: boolean) => !instant ? null
-  : modelled ? `Retrieved ${formatDayWithAge(instant.slice(0, 10))}` : `Entered ${formatTimestamp(instant)}`;
+  : modelled ? t("Retrieved {formatDayWithAge}", { formatDayWithAge: formatDayWithAge(instant.slice(0, 10)) }) : t("Entered {formatTimestamp}", { formatTimestamp: formatTimestamp(instant) });
 
 /** Soil layers: every value tied to its source and kind (DESIGN.md section 8). */
 export function SoilTable({ p, d }: { p: FarmProfile; d: FieldDraft }) {
@@ -40,10 +41,10 @@ export function SoilTable({ p, d }: { p: FarmProfile; d: FieldDraft }) {
   const confirm = useConfirm();
   const prefill = async () => {
     if (farmerLayers && !(await confirm({
-      title: "Replace your soil layers?",
-      confirmLabel: "Replace with SoilGrids",
-      cancelLabel: "Keep my layers",
-      body: <p>Prefilling replaces every layer on {d.name || "this field"}, including the {farmerLayers} you entered. SoilGrids values are mapped estimates at about 250 m, not measurements of this field.</p>,
+      title: t("Replace your soil layers?"),
+      confirmLabel: t("Replace with SoilGrids"),
+      cancelLabel: t("Keep my layers"),
+      body: <p>{t("Prefilling replaces every layer on")} {d.name || t("this field")}{t(", including the {farmerLayers} you entered. SoilGrids values are mapped estimates at about 250 m, not measurements of this field.", { farmerLayers })}</p>,
     }))) return;
     void p.actions.prefillSoil(d.id);
   };
@@ -51,36 +52,36 @@ export function SoilTable({ p, d }: { p: FarmProfile; d: FieldDraft }) {
   return (
     <section aria-labelledby="soil-h">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 id="soil-h" className={sectionTitle}>Soil layers</h2>
+        <h2 id="soil-h" className={sectionTitle}>{t("Soil layers")}</h2>
         <Button className="max-sm:min-h-11" onClick={() => void prefill()} disabled={d.isNew || p.busy === "soil"}
-          title={d.isNew ? "Save the farm first, then prefill this field's soil." : undefined}>
+          title={d.isNew ? t("Save the farm first, then prefill this field's soil.") : undefined}>
           {p.busy === "soil" ? <Loader2 size={15} className="animate-spin" /> : <CloudDownload size={15} strokeWidth={1.75} />}
-          Prefill from SoilGrids
+          {t("Prefill from SoilGrids")}
         </Button>
       </div>
       <p className={`mb-2 ${metaCls}`}>
-        {d.isNew ? "Save the farm first, then prefill this field's soil from SoilGrids."
-          : "SoilGrids gives mapped estimates at about 250 m, not measurements of this field. Lab results you add are kept as yours."}
+        {d.isNew ? t("Save the farm first, then prefill this field's soil from SoilGrids.")
+          : t("SoilGrids gives mapped estimates at about 250 m, not measurements of this field. Lab results you add are kept as yours.")}
       </p>
 
       <ActionError text={p.fieldError?.kind === "soil" ? p.fieldError.text : null} />
       {d.soil.length === 0 ? (
         <p className="rounded-[14px] border border-line p-3 text-sm text-mut">
-          No soil layers yet. Prefill from SoilGrids, or add values from a lab report below.
+          {t("No soil layers yet. Prefill from SoilGrids, or add values from a lab report below.")}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
-            <caption className="sr-only">Soil composition by depth, with the source of each layer</caption>
+            <caption className="sr-only">{t("Soil composition by depth, with the source of each layer")}</caption>
             <thead>
               <tr className="text-left text-[12px] text-mut">
-                <th scope="col" className="py-1 pr-2 font-semibold">Depth</th>
+                <th scope="col" className="py-1 pr-2 font-semibold">{t("Depth")}</th>
                 {COLS.map((c) => (
                   <th key={c.key} scope="col" className="px-1 py-1 text-right font-semibold">
-                    {c.label}{c.unit && <span className="block font-medium">{c.unit}</span>}
+                    {t(c.label)}{c.unit && <span className="block font-medium">{c.unit}</span>}
                   </th>
                 ))}
-                <th scope="col"><span className="sr-only">Remove</span></th>
+                <th scope="col"><span className="sr-only">{t("Remove")}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -89,16 +90,16 @@ export function SoilTable({ p, d }: { p: FarmProfile; d: FieldDraft }) {
                 return (
                   <tr key={l.key} className="border-t border-line">
                     <th scope="row" className="whitespace-nowrap py-1.5 pr-2 text-left font-semibold">
-                      {l.depth_top_cm}–{l.depth_bottom_cm} cm
-                      <sup className="ml-0.5 text-[12px] text-mut" aria-label={`source ${n}`}>{n}</sup>
+                      {t("{depth_top_cm}–{depth_bottom_cm} cm", { depth_top_cm: l.depth_top_cm, depth_bottom_cm: l.depth_bottom_cm })}
+                      <sup className="ml-0.5 text-[12px] text-mut" aria-label={t("source {n}", { n })}>{n}</sup>
                     </th>
                     {COLS.map((c) => (
                       <td key={c.key} className="px-1 py-1.5 text-right">
-                        {fmt(l[c.key]) ?? <span className="text-mut" aria-label="not given">–</span>}
+                        {fmt(l[c.key]) ?? <span className="text-mut" aria-label={t("not given")}>–</span>}
                       </td>
                     ))}
                     <td className="pl-1 text-right">
-                      <button type="button" aria-label={`Remove the ${l.depth_top_cm}–${l.depth_bottom_cm} cm layer`}
+                      <button type="button" aria-label={t("Remove the {depth_top_cm}–{depth_bottom_cm} cm layer", { depth_top_cm: l.depth_top_cm, depth_bottom_cm: l.depth_bottom_cm })}
                         onClick={() => set(d.soil.filter((x) => x.key !== l.key))}
                         className="grid h-7 w-7 place-items-center rounded-[8px] text-mut hover:bg-glass-hi hover:text-tx max-sm:h-11 max-sm:w-11">
                         <Trash2 size={14} strokeWidth={1.75} />
@@ -118,8 +119,8 @@ export function SoilTable({ p, d }: { p: FarmProfile; d: FieldDraft }) {
                   <span>
                     <KindTag kind={kind} className="mr-1.5 align-[1px]" />
                     <span className="text-mut">
-                      {s}
-                      {kind === "modelled" && " Mapped estimate at about 250 m, not a field measurement."}
+                      {t(s)}
+                      {kind === "modelled" && t(" Mapped estimate at about 250 m, not a field measurement.")}
                       {sourceDate(d.soil.find((l) => l.source === s)?.retrieved_at, kind === "modelled") && ` ${sourceDate(d.soil.find((l) => l.source === s)?.retrieved_at, kind === "modelled")}.`}
                     </span>
                   </span>
@@ -146,7 +147,7 @@ function AddLayer({ onAdd }: { onAdd: (l: SoilLayerDraft) => void }) {
   const add = () => {
     const top = Number(v.top), bottom = Number(v.bottom);
     if (!v.top.trim() || !v.bottom.trim() || !Number.isInteger(top) || !Number.isInteger(bottom) || top < 0 || bottom <= top) {
-      setError("Depths are whole centimetres, with the bottom deeper than the top (for example 0 and 30).");
+      setError(t("Depths are whole centimetres, with the bottom deeper than the top (for example 0 and 30)."));
       return;
     }
     const nums = {} as Record<NumKey, number | null>;
@@ -154,13 +155,13 @@ function AddLayer({ onAdd }: { onAdd: (l: SoilLayerDraft) => void }) {
       const raw = v[c.key].trim();
       const n = Number(raw);
       if (raw && (!Number.isFinite(n) || n < 0 || n > c.max)) {
-        setError(`${c.label} must be between 0 and ${c.max}${c.unit ? ` ${c.unit}` : ""}, or empty.`);
+        setError(t("{label} must be between 0 and {max}{v}, or empty.", { label: c.label, max: c.max, v: c.unit ? ` ${c.unit}` : "" }));
         return;
       }
       nums[c.key] = raw ? n : null;
     }
     if (COLS.every((c) => nums[c.key] === null)) {
-      setError("Enter at least one value for the layer.");
+      setError(t("Enter at least one value for the layer."));
       return;
     }
     setError(null);
@@ -178,26 +179,26 @@ function AddLayer({ onAdd }: { onAdd: (l: SoilLayerDraft) => void }) {
 
   return (
     <details className="mt-3">
-      <summary className="cursor-pointer text-[13px] font-semibold text-mut hover:text-tx max-sm:py-3">Add a layer from a lab report</summary>
-      <p className={`mt-2 ${metaCls}`}>The Simulator only uses a layer that has both sand % and clay %. Other values are still saved and shown.</p>
+      <summary className="cursor-pointer text-[13px] font-semibold text-mut hover:text-tx max-sm:py-3">{t("Add a layer from a lab report")}</summary>
+      <p className={`mt-2 ${metaCls}`}>{t("The Simulator only uses a layer that has both sand % and clay %. Other values are still saved and shown.")}</p>
       <div className="mt-2 grid grid-cols-4 gap-2">
-        {box("top", "Top cm")}
-        {box("bottom", "Bottom cm")}
-        {box("sand_pct", "Sand %")}
-        {box("silt_pct", "Silt %")}
-        {box("clay_pct", "Clay %")}
+        {box("top", t("Top cm"))}
+        {box("bottom", t("Bottom cm"))}
+        {box("sand_pct", t("Sand %"))}
+        {box("silt_pct", t("Silt %"))}
+        {box("clay_pct", t("Clay %"))}
         {box("soc_g_kg", "SOC g/kg")}
         {box("ph", "pH")}
       </div>
       {partial && (
         <p className="mt-1.5 flex gap-1.5 text-[12px] leading-snug text-tx" role="note">
           <Info size={14} strokeWidth={1.75} className="mt-px shrink-0 text-rain" />
-          Without {v.sand_pct.trim() ? "clay %" : v.clay_pct.trim() ? "sand %" : "sand % and clay %"}, the Simulator won&apos;t use this layer. You can still add it.
+          {t("Without")} {v.sand_pct.trim() ? t("clay %") : v.clay_pct.trim() ? t("sand %") : t("sand % and clay %")}{t(", the Simulator won't use this layer. You can still add it.")}
         </p>
       )}
-      <p className={`mt-1.5 ${metaCls}`}>Source: {FARMER_SOURCE}. Saved with the farm.</p>
+      <p className={`mt-1.5 ${metaCls}`}>{t("Source: {FARMER_SOURCE}. Saved with the farm.", { FARMER_SOURCE: t(FARMER_SOURCE) })}</p>
       {error && <p role="alert" className="mt-1 text-[12px] text-alert">{error}</p>}
-      <Button className="mt-2 max-sm:min-h-11" onClick={add}><Plus size={15} strokeWidth={1.75} /> Add layer</Button>
+      <Button className="mt-2 max-sm:min-h-11" onClick={add}><Plus size={15} strokeWidth={1.75} /> {t("Add layer")}</Button>
     </details>
   );
 }

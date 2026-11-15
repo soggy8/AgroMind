@@ -6,8 +6,8 @@ Spec and status: `docs/modules/cropdoctor.md`.
 
 - `pages/CommandCenterPage.tsx`: map, field list, indicator rows, 8-day strip, season chart and
   finding block. Floating panels at 1024 px and wider; below that the map with Fields and Status tabs.
-- `components/`: module components, including `AdvisorDrawer.tsx`, which for now only says
-  "Work in progress".
+- `components/`: module components.
+- `state/useAssistantBridge.ts`: lets the assistant (`shared/assistant`) set the date, map layer and field.
 - `api/` calls `GET /api/farms/{id}/health`. `types.ts` mirrors the backend `schemas.py`; change both together.
 - The shared pieces it uses (`Badge`, `FieldRow`, `IndicatorRow`, `SeasonChart`, `WeeklyStrip`, `NdviKey`)
   live in `src/shared/`.

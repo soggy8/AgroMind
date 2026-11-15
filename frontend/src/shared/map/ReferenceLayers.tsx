@@ -1,5 +1,6 @@
 // Shared map layer, added by CropTwin: country borders and place names over the imagery (why Esri, not NASA, is below).
 import { TileLayer } from "react-leaflet";
+import { t } from "../i18n";
 
 /**
  * Country borders and place names over the satellite imagery.
@@ -13,7 +14,7 @@ import { TileLayer } from "react-leaflet";
  * pane) and below field outlines (the overlay pane is above all tiles). See docs/modules/croptwin.md.
  */
 export const REFERENCE_ATTRIBUTION =
-  "Borders and places: Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community";
+  t("Borders and places: Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community");
 
 const URL = "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 

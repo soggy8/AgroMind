@@ -205,3 +205,10 @@ class FarmSummary(_Orm):
     name: str
     region: str | None
     field_count: int
+
+
+class AdvisorContext(BaseModel):
+    """Everything the AI advisor may use to explain a farm profile. It must not go beyond these facts."""
+    instructions: str
+    facts: list[str]
+    suggested_questions: list[str]

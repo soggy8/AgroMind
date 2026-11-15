@@ -7,6 +7,7 @@ import type {
   SimulationResult, SimulatorOptions, Units,
 } from "../types";
 import { MAX_ROTATIONS } from "../types";
+import { t } from "../../../shared/i18n";
 
 export interface Draft {
   fieldId: string;
@@ -92,7 +93,7 @@ const message = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e
 
 export function rotationName(crops: string[], catalogue: CropOption[]): string {
   const name = (id: string) => catalogue.find((c) => c.id === id)?.name ?? id;
-  if (crops.length && crops.every((c) => c === crops[0])) return `Continuous ${name(crops[0]).toLowerCase()}`;
+  if (crops.length && crops.every((c) => c === crops[0])) return t("Continuous {toLowerCase}", { toLowerCase: name(crops[0]).toLowerCase() });
   return crops.map(name).join(" → ");
 }
 
@@ -148,6 +149,8 @@ export function useSimulator(farmId: string) {
   const nextId = (rotations: RotationInput[]) => "ABCDEFGH".split("").find((l) => !rotations.some((r) => r.id === l))!;
 
   const actions = {
+    /** Set every input at once (the assistant, and Undo). */
+    replaceDraft: (d: Draft) => dispatch({ type: "draft", draft: d }),
     setField: (fieldId: string) => update({ fieldId }),
     setScenario: (patch: Partial<Scenario>) => draft && update({ scenario: { ...draft.scenario, ...patch } }),
     setPriority: (k: IndicatorId, v: number) =>

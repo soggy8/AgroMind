@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import geometry, repository, soil_source, weather_source
+from .advisor import advisor_context
 from .geometry import InvalidBoundary
 from .models import CropHistory, Farm, Field, SoilLayer
 from .soil_source import SoilDataUnavailable
@@ -19,7 +20,7 @@ from .weather_source import WeatherUnavailable
 
 __all__ = ["NotFound", "Conflict", "InvalidBoundary", "SoilDataUnavailable", "list_farms", "get_farm", "create_farm", "update_farm",
            "delete_farm", "list_fields", "get_field", "create_field", "update_field", "delete_field",
-           "replace_soil_layers", "prefill_soil_from_soilgrids", "field_weather", "WeatherUnavailable", "add_crop_history", "delete_crop_history"]
+           "replace_soil_layers", "prefill_soil_from_soilgrids", "field_weather", "WeatherUnavailable", "add_crop_history", "delete_crop_history", "advisor_context"]
 
 
 class NotFound(LookupError):

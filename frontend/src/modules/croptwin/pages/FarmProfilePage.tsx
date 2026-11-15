@@ -7,16 +7,18 @@
  * FarmProfile is keyed by farm id, so switching farms starts from a clean state.
  */
 import { AlertTriangle, LocateFixed, MapPin, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMap } from "react-leaflet";
 import { TopBar } from "../../../app/TopBar";
 import type { Route } from "../../../app/route";
-import { Button, Glass, SegmentedTabs, Skeleton } from "../../../shared/components";
+import { Button, Glass, SegmentedTabs, Skeleton, StatusPill, Tour, tourSeen, type TourStep } from "../../../shared/components";
+import { useMedia } from "../../../shared/hooks/useMedia";
+import { useUnits } from "../../../shared/units";
 import { BoundaryDraw, type LatLng } from "../../../shared/map/BoundaryDraw";
 import { FarmMap, type MapField, type MapInsets } from "../../../shared/map/FarmMap";
 import { type LocationProblem, locationProblemText, requestLocation, type UserLocation } from "../../../shared/map/geolocation";
 import { formatDayWithAge } from "../../../shared/map/dates";
-import { type ImageryCapture, ImageryDateWatcher } from "../../../shared/map/ImageryDate";
+import { type ImageryCapture, imageryCredit, ImageryDateWatcher } from "../../../shared/map/ImageryDate";
 import { LocateControl } from "../../../shared/map/LocateControl";
 import { type FocusTarget, MapClick, MapFocus, PointMarker } from "../../../shared/map/MapFocus";
 import { MapSearch, type PlaceResults, type SearchResult } from "../../../shared/map/MapSearch";
@@ -31,8 +33,10 @@ import { FarmPicker } from "../components/FarmPicker";
 import { FieldPanel } from "../components/FieldPanel";
 import { emptyNewFarm, type NewFarmDraft, NewFarmPanel } from "../components/NewFarmPanel";
 import { boundaryIsNew, cropName, overlappingFields } from "../lib/draft";
+import { useAssistantBridge } from "../state/useAssistantBridge";
 import { useFarmProfile } from "../state/useFarmProfile";
 import { type Farms, useFarms } from "../state/useFarms";
+import { t as tr, tn as trn } from "../../../shared/i18n";
 
 // ASSUMPTION: where the map opens when there's nothing to show (no fields, no farm point, no user location):
 // the demo SoilGrids sample point in Story County, Iowa. See docs/modules/croptwin.md.
@@ -42,16 +46,13 @@ const DESKTOP = "(min-width: 1024px)";
 const DESKTOP_INSETS: MapInsets = { left: 370, right: 430, top: 94, bottom: 20 };
 const STACKED_INSETS: MapInsets = { left: 0, right: 0, top: 0, bottom: 0 };
 
-function useMedia(query: string) {
-  return useSyncExternalStore(
-    (cb) => {
-      const m = matchMedia(query);
-      m.addEventListener("change", cb);
-      return () => m.removeEventListener("change", cb);
-    },
-    () => matchMedia(query).matches,
-  );
-}
+const TOUR_ID = "farm-profile-v1";
+const TOUR: TourStep[] = [
+  { target: "fp-farm", title: tr("Your farm"), body: tr("Switch farms, add a new one, and set its name, region and the priorities the Simulator ranks rotations by.") },
+  { target: "fp-fields", title: tr("Your fields"), body: tr("Draw each field on the satellite map, corner by corner, or type the coordinates. Its area is worked out from the outline.") },
+  { target: "fp-field", title: tr("Field details"), body: tr("Crop, irrigation and soil for the selected field. Fill soil layers from ISRIC SoilGrids, add crop history, and see recent NASA weather.") },
+  { target: "advisor", title: tr("Ask about it"), body: tr("The advisor explains what is saved for this farm and points out what is missing. It never adds data of its own.") },
+];
 
 // The map's zoom buttons sit `insets.right + 16` px from the right and are 38 px wide; the drawing
 // toolbar stops 12 px short of them.
@@ -70,7 +71,7 @@ export function FarmProfilePage(props: PageProps) {
 /** Loads the farm list, then opens the chosen farm (a fresh page state per farm). */
 function FarmsShell(props: PageProps) {
   const farms = useFarms();
-  if (!farms.farms) {
+  if (!farms.farms || (farms.error && !farms.farms.length)) {
     return farms.error ? <PageError {...props} message={farms.error} /> : <PageLoading {...props} />;
   }
   return <FarmProfile key={farms.selectedId ?? "none"} {...props} farmId={farms.selectedId} farms={farms} />;
@@ -82,9 +83,10 @@ const readNasaValue = (colormap: string, colour: PixelColour, signal: AbortSigna
 
 /** ", with its 2 fields and 6 soil layers": only the counts that aren't zero, so the dialog never lists "0 …". */
 function withItems(items: [number, string, string][]): string {
-  const parts = items.filter(([n]) => n > 0).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
+  // one/many are translation keys with {n}, e.g. "{n} field" / "{n} fields".
+  const parts = items.filter(([n]) => n > 0).map(([n, one, many]) => trn(n, one, many));
   if (!parts.length) return "";
-  return ` with its ${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0]}`;
+  return tr(" with its {v}", { v: parts.length > 1 ? `${parts.slice(0, -1).join(", ")}${tr(" and ")}${parts[parts.length - 1]}` : parts[0] });
 }
 
 let focusKey = 0;
@@ -109,9 +111,13 @@ async function searchPlaces(q: string, signal: AbortSignal): Promise<PlaceResult
 
 function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId: string | null; farms: Farms }) {
   const p = useFarmProfile(farmId);
+  useAssistantBridge(p, (id) => void farms.refresh(id));
   const { farm, drafts, drawing, actions } = p;
   const desktop = useMedia(DESKTOP);
+  const u = useUnits();
   const confirm = useConfirm();
+  const [touring, setTouring] = useState(false);
+  const endTour = useCallback(() => setTouring(false), []);
   const [sheet, setSheet] = useState<"farm" | "field">("farm");
   const [nasa, setNasa] = useState<NasaOverlay>(NASA_OVERLAY_NONE);
   const [borders, setBorders] = useState(true);
@@ -127,6 +133,22 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
   const [startAsked, setStartAsked] = useState(false); // the "start at your location?" card was answered
   const unsaved = p.dirty || !!drawing;
 
+  // The farm list (top bar switcher, other dashboards) follows saved renames and field counts.
+  const listed = farms.farms?.find((f) => f.id === farm?.id);
+  useEffect(() => {
+    if (farm && listed && (listed.name !== farm.name || listed.region !== farm.region || listed.field_count !== farm.fields.length)) {
+      void farms.refresh(farm.id);
+    }
+  }, [farm, listed, farms]);
+
+  // First visit on a large screen: the tour starts once the panels are on screen (as on every dashboard).
+  useEffect(() => {
+    if (farm && desktop && !tourSeen(TOUR_ID)) {
+      const t = setTimeout(() => setTouring(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, [farm, desktop]);
+
   // Reloads and tab closes: the browser's own prompt (pages can't style it).
   useEffect(() => {
     if (!unsaved) return;
@@ -137,20 +159,20 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
 
   /** Ask before throwing away unsaved work (leaving the page, switching or deleting farms). */
   const okToLeave = useCallback(async (what: string) => !unsaved || confirm({
-    title: "Leave without saving?",
+    title: tr("Leave without saving?"),
     confirmLabel: what,
-    cancelLabel: "Stay and save",
+    cancelLabel: tr("Stay and save"),
     danger: true,
-    body: <p>Your changes to this farm aren&apos;t saved yet{drawing ? ", and a boundary is still being drawn" : ""}. If you continue they&apos;re lost.</p>,
+    body: <p>{tr("Your changes to this farm aren't saved yet")}{drawing ? tr(", and a boundary is still being drawn") : ""}{tr(". If you continue they're lost.")}</p>,
   }), [unsaved, drawing, confirm]);
 
   const navigate = useCallback(async (r: Route) => {
-    if (r !== route && !(await okToLeave("Leave without saving"))) return;
+    if (r !== route && !(await okToLeave(tr("Leave without saving")))) return;
     onNavigate(r);
   }, [route, okToLeave, onNavigate]);
 
   const switchFarm = async (id: string) => {
-    if (id !== farmId && (await okToLeave("Switch without saving"))) farms.select(id);
+    if (id !== farmId && (await okToLeave(tr("Switch without saving")))) farms.select(id);
   };
 
   const deleteFarm = async () => {
@@ -158,18 +180,19 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
     const layers = farm.fields.reduce((n, f) => n + f.soil_layers.length, 0);
     const history = farm.fields.reduce((n, f) => n + f.crop_history.length, 0);
     const ok = await confirm({
-      title: `Delete ${farm.name}?`,
+      title: tr("Delete {name}?", { name: farm.name }),
       danger: true,
-      confirmLabel: "Delete farm",
-      cancelLabel: "Keep it",
+      confirmLabel: tr("Delete farm"),
+      cancelLabel: tr("Keep it"),
       body: (
         <>
           <p>
-            {farm.name} is removed{withItems([
-              [farm.fields.length, "field", "fields"], [layers, "soil layer", "soil layers"], [history, "crop history entry", "crop history entries"],
-            ])}. This can&apos;t be undone.
+            {tr("{name} is removed{withItems}. This can't be undone.", { name: farm.name, withItems: withItems([
+              [farm.fields.length, "{n} field", "{n} fields"], [layers, "{n} soil layer", "{n} soil layers"],
+              [history, "{n} crop history entry", "{n} crop history entries"],
+            ]) })}
           </p>
-          <p>The Simulator&apos;s saved runs for this farm are deleted too.</p>
+          <p>{tr("The Simulator's saved runs for this farm are deleted too.")}</p>
         </>
       ),
     });
@@ -177,7 +200,7 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
     try {
       await farms.remove(farm.id);
     } catch (e) {
-      setCreateError(`Couldn't delete ${farm.name}: ${(e as Error).message} Reload the page to see your farms.`);
+      setCreateError(tr("Couldn't delete {name}: {message} Reload the page to see your farms.", { name: farm.name, message: (e as Error).message }));
     }
   };
 
@@ -198,7 +221,7 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
   }, []);
 
   const startNewFarm = async () => {
-    if (await okToLeave("Continue without saving")) {
+    if (await okToLeave(tr("Continue without saving"))) {
       setCreateError(null);
       setNewFarm(emptyNewFarm());
     }
@@ -214,13 +237,17 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
         location_lat: newFarm.point?.[0] ?? null, location_lon: newFarm.point?.[1] ?? null,
       });
     } catch (e) {
-      setCreateError(`Couldn't create the farm: ${(e as Error).message} Check the name and point, then try again.`);
+      setCreateError(tr("Couldn't create the farm: {message} Check the name and point, then try again.", { message: (e as Error).message }));
       setCreating(false);
     }
   };
 
-  const topBar = <TopBar route={route} onNavigate={(r) => void navigate(r)} farmName={farm?.name ?? (newFarm ? "New farm" : undefined)}
-    region={farm?.region ?? undefined} />;
+  const topBar = (
+    <TopBar route={route} onNavigate={(r) => void navigate(r)} onSwitchFarm={(id) => void switchFarm(id)}
+      farmOverride={newFarm ? { name: tr("New farm") } : farm ? { name: farm.name, region: farm.region } : undefined}
+      status={unsaved && <StatusPill tone="watch">{tr("Unsaved changes")}</StatusPill>}
+      onHelp={() => { if (!desktop) setSheet("farm"); setTouring(true); }} />
+  );
 
   if (p.loadError) return <PageError route={route} onNavigate={onNavigate} message={p.loadError} />;
 
@@ -246,8 +273,8 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
     .filter((d) => d.closed && d.ring.length >= 3 && !(d.isNew && drawing?.fieldId === d.id))
     .map((d) => {
       const area = p.savedField(d.id)?.area_ha;
-      return { id: d.id, name: d.name || "Unnamed field", boundary: d.ring, alert: clashes.some((c) => c.id === d.id),
-        chip: [d.current_crop_id && cropName(d.current_crop_id), area && `${area} ha`].filter(Boolean).join(" · ") };
+      return { id: d.id, name: d.name || tr("Unnamed field"), boundary: d.ring, alert: clashes.some((c) => c.id === d.id),
+        chip: [d.current_crop_id && cropName(d.current_crop_id), area && u.area(area)].filter(Boolean).join(" · ") };
     });
   const drawn = drawing && drafts.find((d) => d.id === drawing.fieldId);
 
@@ -263,11 +290,11 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
   const localResults: SearchResult[] = [
     ...(newFarm ? [] : drafts.filter((d) => d.closed && d.ring.length >= 3).map((d): SearchResult => {
       const lats = d.ring.map((pt) => pt[0]), lons = d.ring.map((pt) => pt[1]);
-      return { id: d.id, kind: "field", title: d.name || "Unnamed field", subtitle: `Field on ${farm?.name ?? "this farm"}`,
+      return { id: d.id, kind: "field", title: d.name || tr("Unnamed field"), subtitle: tr("Field on {v}", { v: farm?.name ?? "this farm" }),
         point: d.ring[0], bounds: [[Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]] };
     })),
     ...(farms.farms ?? []).filter((f) => f.id !== farmId).map((f): SearchResult => ({
-      id: f.id, kind: "farm", title: f.name, subtitle: `Farm · ${f.field_count} ${f.field_count === 1 ? "field" : "fields"}`,
+      id: f.id, kind: "farm", title: f.name, subtitle: `${tr("Farm")} · ${trn(f.field_count, "{n} field", "{n} fields")}`,
       point: center,
     })),
   ];
@@ -285,9 +312,10 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
   const probeField = !newFarm && p.selectedId ? p.savedField(p.selectedId) : undefined;
 
   const insets = desktop ? DESKTOP_INSETS : STACKED_INSETS;
+  const globeOn = !farmId || farmId === "demo";
   const map = !p.loading && (
     <FarmMap fields={mapFields} selectedId={p.selectedId} onSelect={drawing || newFarm ? undefined : selectField} center={center}
-      insets={insets}>
+      insets={insets} startOnGlobe={globeOn} globeLabel={farm?.name ?? "your farm"}>
       <MapFocus target={focus} />
       <ImageryDateWatcher onChange={setImagery} />
       {!drawing && focusField && focusField.ring.length >= 3 && (
@@ -310,8 +338,8 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
             : { left: 8, top: 8, maxWidth: `calc(100% - ${8 + STACKED_INSETS.right + 16 + PHONE_ZOOM_W + 8}px)` }} />
       )}
       <LocateControl busy={locating} onLocate={() => void locate()}
-        // Under the zoom buttons: 2 × 38 px on desktop, 2 × 44 px on phones, plus an 8 px gap.
-        style={{ right: insets.right + 16, top: insets.top + (desktop ? 84 : 96) }} />
+        // Under the zoom buttons (2, or 3 with "Zoom out to the globe"): 38 px each on desktop, 44 px on phones, plus an 8 px gap.
+        style={{ right: insets.right + 16, top: insets.top + (globeOn ? 3 : 2) * (desktop ? 38 : 44) + 8 }} />
       <NasaLayerControl value={nasa} onChange={setNasa} borders={borders} onBorders={setBorders} readValue={readNasaValue}
         probe={probeField ? { label: probeField.name, point: [probeField.centroid_lat, probeField.centroid_lon] } : null}
         // The panel opens upward and stops below the search box (44 px tall + a 12 px gap).
@@ -324,15 +352,14 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
 
   // "Start at your location?" (asked once, with the reason), then the fallback notice if it's off.
   const startCard = !drawing && (nothingToShow && !startAsked && !me ? (
-    <Glass className="w-full max-w-[380px] p-4" role="region" aria-label="Start the map at your location">
-      <p className="flex items-center gap-2 text-[15px] font-bold"><LocateFixed size={17} strokeWidth={1.75} /> Start the map where you are?</p>
+    <Glass className="w-full max-w-[380px] p-4" role="region" aria-label={tr("Start the map at your location")}>
+      <p className="flex items-center gap-2 text-[15px] font-bold"><LocateFixed size={17} strokeWidth={1.75} /> {tr("Start the map where you are?")}</p>
       <p className="mt-1 text-[13px] leading-snug text-mut">
-        {newFarm ? "This farm has no point yet." : "This farm has no fields or map point yet."} Your location only centres the
-        map in this browser. It isn&apos;t saved or sent anywhere unless you create a farm with it.
+        {newFarm ? tr("This farm has no point yet.") : tr("This farm has no fields or map point yet.")} {tr("Your location only centres the map in this browser. It isn't saved or sent anywhere unless you create a farm with it.")}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button className="max-sm:min-h-11" onClick={() => void locate()} disabled={locating}>Use my location</Button>
-        <Button variant="ghost" className="max-sm:min-h-11" onClick={() => setStartAsked(true)}>Not now</Button>
+        <Button className="max-sm:min-h-11" onClick={() => void locate()} disabled={locating}>{tr("Use my location")}</Button>
+        <Button variant="ghost" className="max-sm:min-h-11" onClick={() => setStartAsked(true)}>{tr("Not now")}</Button>
       </div>
     </Glass>
   ) : onFallback && !me && (startAsked || locationProblem) ? (
@@ -340,8 +367,8 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
       <p className="flex items-start gap-2 text-[13px] leading-snug">
         <MapPin size={15} strokeWidth={1.75} className="mt-px shrink-0 text-mut" />
         <span>
-          <span className="font-semibold">Location off: showing {FALLBACK_NAME}.</span>{" "}
-          <span className="text-mut">{locationProblem ? locationProblemText[locationProblem] : "Search for your area or allow location."}</span>
+          <span className="font-semibold">{tr("Location off: showing {FALLBACK_NAME}.", { FALLBACK_NAME })}</span>{" "}
+          <span className="text-mut">{locationProblem ? locationProblemText[locationProblem] : tr("Search for your area or allow location.")}</span>
         </span>
       </p>
     </Glass>
@@ -356,14 +383,8 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
   // DESIGN.md section 8.3: the map says what it shows and from when.
   const overlay = NASA_LAYERS.find((l) => l.key === nasa.key);
   // When the imagery under the map centre was captured, from Esri's own metadata (ImageryDate.tsx).
-  const imageryText = imagery === null ? "Imagery © Esri"
-    : imagery === "error" ? "Imagery © Esri (capture date unavailable right now)"
-      : imagery.date ? `Imagery © Esri, captured ${formatDayWithAge(imagery.date)}${
-        imagery.source || imagery.resolutionM ? ` (${[imagery.source, imagery.resolutionM && `${imagery.resolutionM} m`].filter(Boolean).join(", ")})` : ""}`
-        : "Imagery © Esri (capture date not published by Esri here)";
-  const sourceText = `${imageryText} · Soil ISRIC SoilGrids v2.0 (saved sample)${
-    overlay?.gibs && nasa.date ? ` · NASA GIBS ${overlay.product.shortName} ${formatDayWithAge(nasa.date)}` : ""}${
-    borders ? ` · ${REFERENCE_ATTRIBUTION}` : ""}`;
+  const imageryText = imageryCredit(imagery);
+  const sourceText = tr("{imageryText} · Soil ISRIC SoilGrids v2.0 (saved sample){v}{v2}", { imageryText, v: overlay?.gibs && nasa.date ? ` · NASA GIBS ${overlay.product.shortName} ${formatDayWithAge(nasa.date)}` : "", v2: borders ? ` · ${REFERENCE_ATTRIBUTION}` : "" });
   const sourcePill = <div className="glass max-w-full !rounded-[10px] px-[11px] py-[6px] text-[12px] leading-snug">{sourceText}</div>;
 
   const picker = farms.farms && (
@@ -379,43 +400,52 @@ function FarmProfile({ route, onNavigate, farmId, farms }: PageProps & { farmId:
   const right = farm ? <FieldPanel p={p} /> : <PanelSkeleton />;
   const showRight = !newFarm && (!farm || p.selectedId);
 
+  const pageTitle = <h1 className="sr-only">{tr("Farm profile")}</h1>;
   return (
     <div className={desktop ? "relative h-full overflow-hidden" : "flex min-h-full flex-col"}>
       {desktop ? (
         <>
-          {map}
+          <main aria-label={tr("Farm map")} className="absolute inset-0">
+            {pageTitle}
+            {map}
+            {startCard && <div className="absolute left-[390px] right-[450px] top-[45%] z-10 flex justify-center">{startCard}</div>}
+            {/* The source line stays between the panels and wraps (DESIGN.md section 8.3: always visible, never on a panel). */}
+            <div className="absolute bottom-5 left-[390px] right-[450px] z-10 flex justify-end">{sourcePill}</div>
+          </main>
           <div className="absolute inset-x-0 top-0 z-20">{topBar}</div>
-          <Glass as="aside" aria-label="Farm and fields" className="anim-in absolute bottom-5 left-5 top-[94px] z-10 w-[350px] overflow-hidden">
+          <Glass as="aside" aria-label={tr("Farm and fields")} data-tour="fp-farm" className="anim-in absolute bottom-5 left-5 top-[94px] z-10 w-[350px] overflow-hidden">
             {left}
           </Glass>
           {showRight && (
-            <Glass as="aside" aria-label="Selected field" className="anim-in absolute bottom-5 right-5 top-[94px] z-10 w-[410px] overflow-hidden">
+            <Glass as="aside" aria-label={tr("Selected field")} data-tour="fp-field" className="anim-in absolute bottom-5 right-5 top-[94px] z-10 w-[410px] overflow-hidden">
               {right}
             </Glass>
           )}
-          {startCard && <div className="absolute left-[390px] right-[450px] top-[45%] z-10 flex justify-center">{startCard}</div>}
-          {/* The source line stays between the panels and wraps (DESIGN.md section 8.3: always visible, never on a panel). */}
-          <div className="absolute bottom-5 left-[390px] right-[450px] z-10 flex justify-end">{sourcePill}</div>
+
         </>
       ) : (
         <>
           {topBar}
-          <div className="relative mx-4 mt-3 h-[42vh] min-h-[260px] overflow-hidden rounded-panel border border-line">
+          <main aria-label={tr("Farm map")} className="relative isolate mx-4 mt-3 block h-[42vh] min-h-[260px] overflow-hidden rounded-panel border border-line">
+            {pageTitle}
             {map || <Skeleton className="h-full w-full" />}
-          </div>
+          </main>
           {startCard && <div className="mx-4 mt-3">{startCard}</div>}
-          <Glass as="section" className="mx-4 mb-4 mt-3 flex min-h-[70vh] flex-col overflow-hidden">
+          <Glass as="section" aria-label={tr("Farm profile")} className="mx-4 mb-4 mt-3 flex min-h-[70vh] flex-col overflow-hidden">
             {!newFarm && (
               <div className="border-b border-line p-2.5">
-                <SegmentedTabs label="Farm profile views" value={sheet} onChange={setSheet} className="[&>button]:min-h-11"
-                  items={[{ id: "farm", label: "Farm & fields" }, { id: "field", label: "Selected field" }]} />
+                <SegmentedTabs label={tr("Farm profile views")} value={sheet} onChange={setSheet} className="[&>button]:min-h-11"
+                  items={[{ id: "farm", label: tr("Farm & fields") }, { id: "field", label: tr("Selected field") }]} />
               </div>
             )}
-            <div className="flex min-h-0 flex-1 flex-col">{newFarm || sheet === "farm" ? left : right}</div>
+            <div className="flex min-h-0 flex-1 flex-col" data-tour={newFarm || sheet === "farm" ? "fp-farm" : "fp-field"}>
+              {newFarm || sheet === "farm" ? left : right}
+            </div>
           </Glass>
-          <div className="mx-4 mb-4 text-[12px] text-mut">{sourceText}</div>
+          <footer className="mx-4 mb-4 text-[12px] text-mut">{sourceText}</footer>
         </>
       )}
+      {touring && <Tour id={TOUR_ID} steps={TOUR} onClose={endTour} />}
     </div>
   );
 }
@@ -447,10 +477,10 @@ function PageError({ route, onNavigate, message }: PageProps & { message: string
       <main className="grid flex-1 place-items-center p-6">
         <Glass className="max-w-md p-6">
           <h1 className="flex items-center gap-2 text-[19px] font-bold">
-            <AlertTriangle size={20} strokeWidth={1.75} className="text-alert" /> Couldn&apos;t load the farm profile
+            <AlertTriangle size={20} strokeWidth={1.75} className="text-alert" /> {tr("Couldn't load the farm profile")}
           </h1>
           <p className="mt-2 text-sm leading-normal text-mut">{message}</p>
-          <Button className="mt-4" onClick={() => location.reload()}><RefreshCw size={15} strokeWidth={1.75} /> Try again</Button>
+          <Button className="mt-4" onClick={() => location.reload()}><RefreshCw size={15} strokeWidth={1.75} /> {tr("Try again")}</Button>
         </Glass>
       </main>
     </div>
@@ -468,7 +498,7 @@ function PageLoading({ route, onNavigate }: PageProps) {
 
 function PanelSkeleton() {
   return (
-    <div className="space-y-3 p-[18px]" aria-busy="true" aria-label="Loading the farm profile">
+    <div className="space-y-3 p-[18px]" aria-busy="true" aria-label={tr("Loading the farm profile")}>
       <Skeleton className="h-5 w-24" />
       {[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
       <Skeleton className="mt-6 h-5 w-32" />

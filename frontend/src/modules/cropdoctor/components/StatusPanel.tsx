@@ -7,8 +7,9 @@ import type { FarmHealth, FieldHealth, Finding } from "../types";
 import { growingSeason } from "./FieldsPanel";
 import { FindingBlock } from "./FindingBlock";
 import { HowWorkedOut } from "./HowWorkedOut";
+import { t } from "../../../shared/i18n";
 
-const PAUSED = "Stress checks are paused";
+const PAUSED = t("Stress checks are paused");
 
 /** The API's note without a leading "Stress checks are paused: ", which the heading already says. */
 function pausedNote(note: string | null): string | null {
@@ -20,7 +21,7 @@ function pausedNote(note: string | null): string | null {
 
 function StateBlock({ icon, title, tone, children }: { icon: ReactNode; title: string; tone: string; children?: ReactNode }) {
   return (
-    <section aria-label="Field state" className="border-b border-line pb-4">
+    <section aria-label={t("Field state")} className="border-b border-line pb-4">
       <h2 className={`flex items-start gap-2 text-[21px] font-bold leading-tight tracking-[-.01em] ${tone}`}>{icon}{title}</h2>
       {children}
     </section>
@@ -39,7 +40,7 @@ function Top({ health, field, finding, onSelect }: { health: FarmHealth; field: 
   }
   if (field.status === "no_data") {
     return (
-      <StateBlock icon={icon(CircleHelp)} title="No comparison for this date" tone="text-tx">
+      <StateBlock icon={icon(CircleHelp)} title={t("No comparison for this date")} tone="text-tx">
         <p className="mt-2 text-sm leading-normal">{field.name}: {field.status_note}</p>
       </StateBlock>
     );
@@ -47,18 +48,18 @@ function Top({ health, field, finding, onSelect }: { health: FarmHealth; field: 
   const others = health.findings.filter((f) => f.field_id !== field.id);
   if (others.length === 0 && !health.fields.some((f) => f.status === "paused")) {
     return (
-      <StateBlock icon={icon(CircleCheck)} title="All fields within normal range" tone="text-ok">
-        <p className="mt-2 text-sm leading-normal">No field shows a run of low greenness periods on {fmtDate(health.as_of)}.</p>
+      <StateBlock icon={icon(CircleCheck)} title={t("All fields within normal range")} tone="text-ok">
+        <p className="mt-2 text-sm leading-normal">{t("No field shows a run of low greenness periods on {fmtDate}.", { fmtDate: fmtDate(health.as_of) })}</p>
       </StateBlock>
     );
   }
   return (
-    <StateBlock icon={icon(CircleCheck)} title={`${field.name} is within its normal range`} tone="text-ok">
+    <StateBlock icon={icon(CircleCheck)} title={t("{name} is within its normal range", { name: field.name })} tone="text-ok">
       {others.map((f) => (
         <p key={f.field_id} className="mt-2 text-sm leading-normal">
-          {f.field_name} has a finding: {f.headline.toLowerCase()}.{" "}
+          {t("{field_name} has a finding: {toLowerCase}.{v}", { field_name: f.field_name, toLowerCase: f.headline.toLowerCase(), v: " " })}
           <button type="button" onClick={() => onSelect(f.field_id)} className="font-semibold text-lime underline-offset-2 hover:underline">
-            Show {f.field_name}
+            {t("Show {field_name}", { field_name: f.field_name })}
           </button>
         </p>
       ))}
@@ -83,16 +84,16 @@ function SeasonSection({ field, finding }: { field: FieldHealth; finding: Findin
   return (
     <section aria-labelledby="cd-season-h">
       <div className="flex items-center justify-between">
-        <h3 id="cd-season-h" className="text-[15px] font-bold">Greenness this season</h3>
+        <h3 id="cd-season-h" className="text-[15px] font-bold">{t("Greenness this season")}</h3>
         <KindTag kind="observed" />
       </div>
-      <p className="mt-0.5 text-[12px] text-mut">{field.name} · NDVI, 16-day periods from 1 Apr · MODIS</p>
+      <p className="mt-0.5 text-[12px] text-mut">{t("{name} · NDVI, 16-day periods from 1 Apr · MODIS", { name: field.name })}</p>
       {points.length > 0 ? (
-        <SeasonChart points={points} years={[String(y), String(y - 1), String(y - 2)]} ticks={ticks} normalLabel="10-yr normal"
-          marker={finding ? { x: dayOfYear(finding.since), label: `Decline from ${fmtDayMonth(finding.since)}` } : undefined}
-          ariaLabel={`Greenness of ${field.name} in ${y}, against ${y - 1}, ${y - 2} and the normal of the previous 10 years`} />
+        <SeasonChart points={points} years={[String(y), String(y - 1), String(y - 2)]} ticks={ticks} normalLabel={t("10-yr normal")}
+          marker={finding ? { x: dayOfYear(finding.since), label: t("Decline from {fmtDayMonth}", { fmtDayMonth: fmtDayMonth(finding.since) }) } : undefined}
+          ariaLabel={t("Greenness of {name} in {y}, against {y1}, {y2} and the normal of the previous 10 years", { name: field.name, y, y1: y - 1, y2: y - 2 })} />
       ) : (
-        <p className="mt-2 text-[13px] text-mut">No greenness readings for this field.</p>
+        <p className="mt-2 text-[13px] text-mut">{t("No greenness readings for this field.")}</p>
       )}
     </section>
   );
@@ -108,7 +109,7 @@ export function StatusPanel({ health, field, onSelect }: { health: FarmHealth; f
       {field && <SeasonSection field={field} finding={finding} />}
       <p className="text-[12px] leading-[1.45] text-mut">
         {health.data_note}
-        {pastData && ` Saved data runs to ${fmtDate(health.data_through!)}.`}
+        {pastData && t(" Saved data runs to {fmtDate}.", { fmtDate: fmtDate(health.data_through!) })}
       </p>
       <div className="border-t border-line pt-4">
         <HowWorkedOut assumptions={health.assumptions} sources={health.sources} />

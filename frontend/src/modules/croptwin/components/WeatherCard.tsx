@@ -1,15 +1,18 @@
 /**
  * CropTwin: the last 30 days of NASA POWER daily weather at the selected field's centroid
- * (GET /api/farms/{farm}/fields/{field}/weather, backend weather_source.py). Labelled MODELLED. Units and long names
- * come from POWER's response; the 30-day totals and means are computed here, and the card says so.
+ * (GET /api/farms/{farm}/fields/{field}/weather, backend weather_source.py). Labelled OBSERVED with its source, as NASA
+ * POWER weather is on every dashboard (DESIGN.md section 6). Units and long names come from POWER's response and follow
+ * the shared Metric/US setting; the 30-day totals and means are computed here, and the card says so.
  */
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { KindTag } from "../../../shared/components";
+import { useUnits } from "../../../shared/units";
 import { formatDay, formatDayWithAge } from "../../../shared/map/dates";
 import { croptwinApi } from "../api/croptwinApi";
 import type { WeatherOut, WeatherSeries } from "../types";
 import { metaCls, sectionTitle } from "./form";
+import { t as tr } from "../../../shared/i18n";
 
 /** Display form of POWER's unit strings (the units themselves come from POWER's response). */
 const UNIT: Record<string, string> = { C: "°C", "MJ/m^2/day": "MJ/m²/day" };
@@ -17,13 +20,20 @@ const unit = (u: string) => UNIT[u] ?? u;
 
 /** Per parameter: what the 30-day figure is, and which token colour its line uses (DESIGN.md indicator hues). */
 const SUMMARY: Record<string, { how: "total" | "mean"; hue: string; label: string }> = {
-  PRECTOTCORR: { how: "total", hue: "var(--color-rain)", label: "Precipitation" },
-  T2M_MAX: { how: "mean", hue: "var(--color-heat)", label: "Max air temperature" },
-  T2M_MIN: { how: "mean", hue: "var(--color-heat)", label: "Min air temperature" },
-  ALLSKY_SFC_SW_DWN: { how: "mean", hue: "var(--color-soil)", label: "Solar radiation" },
+  PRECTOTCORR: { how: "total", hue: "var(--color-rain)", label: tr("Precipitation") },
+  T2M_MAX: { how: "mean", hue: "var(--color-heat)", label: tr("Max air temperature") },
+  T2M_MIN: { how: "mean", hue: "var(--color-heat)", label: tr("Min air temperature") },
+  ALLSKY_SFC_SW_DWN: { how: "mean", hue: "var(--color-soil)", label: tr("Solar radiation") },
 };
 
 const round = (n: number) => Math.round(n * 10) / 10;
+
+/** POWER speaks metric; with US units, rain becomes inches and temperature °F. */
+function convert(units: string, us: boolean): { f: (v: number) => number; unit: string } {
+  if (us && units === "C") return { f: (v) => v * 1.8 + 32, unit: "°F" };
+  if (us && units === "mm/day") return { f: (v) => Math.round((v / 25.4) * 100) / 100, unit: "in/day" };
+  return { f: (v) => v, unit: unit(units) };
+}
 
 /** Last 30 days of NASA POWER daily weather at the field's centroid (Modelled, with POWER's own units). */
 export function WeatherCard({ farmId, fieldId }: { farmId: string; fieldId: string }) {
@@ -44,28 +54,27 @@ export function WeatherCard({ farmId, fieldId }: { farmId: string; fieldId: stri
   return (
     <section aria-labelledby="weather-h">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 id="weather-h" className={sectionTitle}>Recent weather</h2>
-        <KindTag kind="modelled" />
+        <h2 id="weather-h" className={sectionTitle}>{tr("Recent weather")}</h2>
+        <KindTag kind="observed" />
       </div>
       {state.status === "loading" && (
-        <p className="flex items-center gap-1.5 text-[13px] text-mut" role="status"><Loader2 size={13} className="animate-spin" /> Loading NASA POWER data…</p>
+        <p className="flex items-center gap-1.5 text-[13px] text-mut" role="status"><Loader2 size={13} className="animate-spin" /> {tr("Loading NASA POWER data…")}</p>
       )}
       {state.status === "error" && <p role="alert" className="text-[13px] leading-snug text-alert">{state.error}</p>}
       {w && (
         <>
           <p className={`mb-2 ${metaCls}`}>
-            Daily values at the field&apos;s centre, {w.start && w.end ? `${formatDay(w.start)} – ${formatDay(w.end)}` : "last 30 days"}.
-            {lastWithData ? ` Last day with data: ${formatDayWithAge(lastWithData)}.` : " No days with data yet."} Recent days fill in as
-            NASA processes them.
+            {tr("Daily values at the field's centre,")} {w.start && w.end ? `${formatDay(w.start)} – ${formatDay(w.end)}` : tr("last 30 days")}.
+            {lastWithData ? tr(" Last day with data: {formatDayWithAge}.", { formatDayWithAge: formatDayWithAge(lastWithData) }) : tr(" No days with data yet.")} {tr("Recent days fill in as NASA processes them.")}
           </p>
           <table className="w-full text-[13px]">
-            <caption className="sr-only">NASA POWER daily weather, last 30 days</caption>
+            <caption className="sr-only">{tr("NASA POWER daily weather, last 30 days")}</caption>
             <thead>
               <tr className="text-left text-[12px] text-mut">
-                <th scope="col" className="py-1 pr-2 font-semibold">Daily</th>
-                <th scope="col" className="px-1 py-1 text-right font-semibold">30 days</th>
-                <th scope="col" className="px-1 py-1 text-right font-semibold">Latest</th>
-                <th scope="col" className="py-1 pl-2"><span className="sr-only">Trend</span></th>
+                <th scope="col" className="py-1 pr-2 font-semibold">{tr("Daily")}</th>
+                <th scope="col" className="px-1 py-1 text-right font-semibold">{tr("30 days")}</th>
+                <th scope="col" className="px-1 py-1 text-right font-semibold">{tr("Latest")}</th>
+                <th scope="col" className="py-1 pl-2"><span className="sr-only">{tr("Trend")}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -73,9 +82,7 @@ export function WeatherCard({ farmId, fieldId }: { farmId: string; fieldId: stri
             </tbody>
           </table>
           <p className={`mt-2 ${metaCls}`}>
-            Modelled: {w.source}, built from {w.sources.join(", ")} (as listed in POWER&apos;s response). Point {w.latitude.toFixed(2)},{" "}
-            {w.longitude.toFixed(2)}; days in {w.time_standard === "LST" ? "local solar time" : w.time_standard}. 30-day figures are
-            computed by AgroMind from these daily values.
+            {tr("Observed: {source}, built from {join} (as listed in POWER's response). Point {toFixed},{v}{toFixed2}; days in", { source: w.source, join: w.sources.join(", "), toFixed: w.latitude.toFixed(2), v: " ", toFixed2: w.longitude.toFixed(2) })} {w.time_standard === "LST" ? tr("local solar time") : w.time_standard}{tr(". 30-day figures are computed by AgroMind from these daily values.")}
           </p>
         </>
       )}
@@ -85,26 +92,29 @@ export function WeatherCard({ farmId, fieldId }: { farmId: string; fieldId: stri
 
 function Row({ s }: { s: WeatherSeries }) {
   const meta = SUMMARY[s.id] ?? { how: "mean", hue: "var(--color-mut)", label: s.name };
-  const known = s.values.map((v, i) => ({ v, d: s.dates[i] })).filter((x): x is { v: number; d: string } => x.v !== null);
+  const c = convert(s.units, useUnits().system === "us");
+  const known = s.values.map((v, i) => ({ v, d: s.dates[i] })).filter((x): x is { v: number; d: string } => x.v !== null)
+    .map((x) => ({ ...x, v: c.f(x.v) }));
   const summary = known.length
-    ? round(meta.how === "total" ? known.reduce((t, x) => t + x.v, 0) : known.reduce((t, x) => t + x.v, 0) / known.length)
+    ? meta.how === "total" ? known.reduce((t, x) => t + x.v, 0) : known.reduce((t, x) => t + x.v, 0) / known.length
     : null;
   const latest = known[known.length - 1];
-  const u = unit(s.units);
+  const u = c.unit;
+  const total = (n: number) => (c.unit === "in/day" ? Math.round(n * 100) / 100 : round(n));
   return (
     <tr className="border-t border-line align-middle">
       <th scope="row" className="py-1.5 pr-2 text-left font-semibold">
-        {meta.label}
+        {tr(meta.label)}
         <span className="block text-[12px] font-normal text-mut">{s.name} ({u})</span>
       </th>
       <td className="px-1 py-1.5 text-right">
-        {summary === null ? "–" : <>{summary} <span className="text-[12px] text-mut">{meta.how === "total" ? `${u.replace("/day", "")} total` : `${u} mean`}</span></>}
-        {known.length < s.values.length && <span className="block text-[12px] text-mut">{known.length} of {s.values.length} days</span>}
+        {summary === null ? "–" : <>{total(summary)} <span className="text-[12px] text-mut">{meta.how === "total" ? tr("{replace} total", { replace: u.replace("/day", "") }) : tr("{u} mean", { u })}</span></>}
+        {known.length < s.values.length && <span className="block text-[12px] text-mut">{tr("{length} of {length2} days", { length: known.length, length2: s.values.length })}</span>}
       </td>
       <td className="px-1 py-1.5 text-right">
-        {latest ? <>{round(latest.v)}<span className="block text-[12px] text-mut">{formatDay(latest.d).replace(/, \d{4}$/, "")}</span></> : "–"}
+        {latest ? <>{total(latest.v)}<span className="block text-[12px] text-mut">{formatDay(latest.d).replace(/, \d{4}$/, "")}</span></> : "–"}
       </td>
-      <td className="py-1.5 pl-2"><Spark values={s.values} colour={meta.hue} label={`${meta.label}, daily`} /></td>
+      <td className="py-1.5 pl-2"><Spark values={s.values} colour={meta.hue} label={tr("{label}, daily", { label: meta.label })} /></td>
     </tr>
   );
 }

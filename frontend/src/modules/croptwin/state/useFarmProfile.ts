@@ -8,7 +8,8 @@ import { ApiError } from "../../../shared/api/http";
 import type { LatLng } from "../../../shared/map/BoundaryDraw";
 import { croptwinApi } from "../api/croptwinApi";
 import { changesFor, cropName, draftFromField, type FieldDraft, isDirty, newDraft } from "../lib/draft";
-import type { CropHistoryIn, FarmOut, FarmPriorities, FieldOut } from "../types";
+import type { CropHistoryIn, FarmOut, FarmPriorities, FarmUpdate, FieldOut, FieldUpdate } from "../types";
+import { t } from "../../../shared/i18n";
 
 interface FarmDraft {
   name: string;
@@ -30,11 +31,11 @@ const sentence = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
 function loadErrorText(e: unknown, farmId: string): string {
   if (e instanceof ApiError && e.status === 404) {
     return farmId === "demo"
-      ? "The demo farm isn't in the database yet. In backend/, run python -m app.modules.croptwin.seed, then reload this page."
-      : `Farm '${farmId}' doesn't exist. Pick another farm from the list, or create a new one.`;
+      ? t("The demo farm isn't in the database yet. In backend/, run python -m app.modules.croptwin.seed, then reload this page.")
+      : t("Farm '{farmId}' doesn't exist. Pick another farm from the list, or create a new one.", { farmId });
   }
   if (e instanceof ApiError && e.status === 0) return e.message;
-  return `${sentence(message(e))} Reload the page to try again.`;
+  return t("{sentence} Reload the page to try again.", { sentence: sentence(message(e)) });
 }
 
 const farmDraftOf = (f: FarmOut): FarmDraft =>
@@ -115,12 +116,12 @@ export function useFarmProfile(farmId: string | null) {
 
   // ---------- boundary drawing ----------
 
-  const startNewField = useCallback(() => {
+  const startNewField = useCallback((prefill: Partial<FieldDraft> = {}) => {
     // The first "Field N" that no other field is called, so a new draft never repeats an existing name.
     const taken = new Set(drafts.map((x) => x.name.trim()));
     let n = drafts.length + 1;
-    while (taken.has(`Field ${n}`)) n++;
-    const d = newDraft(n);
+    while (taken.has(t("Field {n}", { n }))) n++;
+    const d = { ...newDraft(n), ...prefill };
     setDrafts((prev) => [...prev, d]);
     setSelectedId(d.id);
     setDrawing({ fieldId: d.id, backup: null, previous: selectedId });
@@ -170,7 +171,7 @@ export function useFarmProfile(farmId: string | null) {
     const done: string[] = [];
     try {
       if (farmDirty) {
-        if (!farmDraft.name.trim()) throw new Error("Give the farm a name, then press Save farm again.");
+        if (!farmDraft.name.trim()) throw new Error(t("Give the farm a name, then press Save farm again."));
         let updated: FarmOut;
         try {
           updated = await croptwinApi.updateFarm(farm.id, {
@@ -178,7 +179,7 @@ export function useFarmProfile(farmId: string | null) {
             priorities: farmDraft.priorities, constraints: farmDraft.constraints.trim() || null,
           });
         } catch (e) {
-          throw new Error(`Couldn't save the farm: ${sentence(message(e))} Press Save farm to try again.`);
+          throw new Error(t("Couldn't save the farm: {sentence} Press Save farm to try again.", { sentence: sentence(message(e)) }));
         }
         setFarm((prev) => prev && { ...prev, name: updated.name, region: updated.region, priorities: updated.priorities,
           constraints: updated.constraints });
@@ -198,14 +199,14 @@ export function useFarmProfile(farmId: string | null) {
           if (d.id === selectedId) setSelectedId(f!.id);
           done.unshift(f!.name);
         } catch (e) {
-          throw new Error(`Couldn't save ${d.name.trim() || "the field"}: ${sentence(message(e))} Fix it and press Save farm again.`);
+          throw new Error(t("Couldn't save {v}: {sentence} Fix it and press Save farm again.", { v: d.name.trim() || "the field", sentence: sentence(message(e)) }));
         }
       }
     } catch (e) {
       setSaveError(message(e));
     } finally {
       setSaving(false);
-      setLastSaved(done.length ? `Saved ${listOf(done)}.` : null);
+      setLastSaved(done.length ? t("Saved {listOf}.", { listOf: listOf(done) }) : null);
     }
   }, [farm, farmDraft, drawing, farmDirty, farmChanged, dirtyFields, acceptField, selectedId, drafts]);
 
@@ -218,7 +219,7 @@ export function useFarmProfile(farmId: string | null) {
     try {
       await croptwinApi.deleteField(farm.id, fieldId);
     } catch (e) {
-      setSaveError(`Couldn't delete ${name}: ${sentence(message(e))} Reload the page to see the current fields.`);
+      setSaveError(t("Couldn't delete {name}: {sentence} Reload the page to see the current fields.", { name, sentence: sentence(message(e)) }));
       return false;
     } finally {
       setBusy(null);
@@ -228,7 +229,7 @@ export function useFarmProfile(farmId: string | null) {
     setDrafts(rest);
     setFarm((prev) => prev && { ...prev, fields: prev.fields.filter((f) => f.id !== fieldId) });
     setSelectedId(rest[Math.min(i, rest.length - 1)]?.id);
-    setLastSaved(`Deleted ${name}.`);
+    setLastSaved(t("Deleted {name}.", { name }));
     return true;
   }, [farm, drafts]);
 
@@ -256,7 +257,7 @@ export function useFarmProfile(farmId: string | null) {
   const addCropHistory = useCallback((fieldId: string, entry: CropHistoryIn) =>
     run("history", () => croptwinApi.addCropHistory(farmId!, fieldId, entry), fieldId, (e) =>
       e instanceof ApiError && e.status === 409
-        ? `${cropName(entry.crop_id)} is already recorded for ${entry.season_year} on this field. Remove that entry first to change it.`
+        ? t("{cropName} is already recorded for {season_year} on this field. Remove that entry first to change it.", { cropName: cropName(entry.crop_id), season_year: entry.season_year })
         : sentence(message(e))), [run, farmId]);
 
   const deleteCropHistory = useCallback((fieldId: string, entryId: string) =>
@@ -265,6 +266,46 @@ export function useFarmProfile(farmId: string | null) {
       setFarm((prev) => prev && { ...prev, fields: prev.fields.map((x) => (x.id === fieldId
         ? { ...x, crop_history: x.crop_history.filter((h) => h.id !== entryId) } : x)) });
     }, fieldId), [run, farmId]);
+
+  // ---------- changes the farmer confirmed in the assistant (saved straight away) ----------
+
+  /** Save confirmed field changes. Refuses while that field has unsaved edits, so nothing typed is lost. */
+  const saveFieldChange = useCallback(async (fieldId: string, body: FieldUpdate) => {
+    if (!farm) throw new Error(t("The farm isn't loaded yet."));
+    const d = drafts.find((x) => x.id === fieldId);
+    const saved = farm.fields.find((f) => f.id === fieldId);
+    if (!saved) throw new Error(t("That field isn't saved yet."));
+    if (d && isDirty(d, saved)) throw new Error(t("{name} has unsaved edits. Save or undo them first, then confirm again.", { name: saved.name }));
+    const f = await croptwinApi.updateField(farm.id, fieldId, body);
+    acceptField(f, fieldId, "all");
+    setLastSaved(t("Saved {name}.", { name: f.name }));
+    return f;
+  }, [farm, drafts, acceptField]);
+
+  /** Save a confirmed crop-history entry; throws with a readable message on failure. */
+  const saveCropHistory = useCallback(async (fieldId: string, entry: CropHistoryIn) => {
+    if (!farm) throw new Error(t("The farm isn't loaded yet."));
+    try {
+      const f = await croptwinApi.addCropHistory(farm.id, fieldId, entry);
+      acceptField(f, fieldId, "none");
+      setLastSaved(t("Saved {name}'s crop history.", { name: f.name }));
+    } catch (e) {
+      throw new Error(e instanceof ApiError && e.status === 409
+        ? t("{cropName} is already recorded for {season_year} on this field.", { cropName: cropName(entry.crop_id), season_year: entry.season_year }) : sentence(message(e)));
+    }
+  }, [farm, acceptField]);
+
+  /** Save confirmed farm changes. Refuses while the farm details have unsaved edits. */
+  const saveFarmChange = useCallback(async (body: FarmUpdate) => {
+    if (!farm) throw new Error(t("The farm isn't loaded yet."));
+    if (farmDirty) throw new Error(t("The farm details have unsaved edits. Save or undo them first, then confirm again."));
+    const updated = await croptwinApi.updateFarm(farm.id, body);
+    setFarm((prev) => prev && { ...prev, name: updated.name, region: updated.region, priorities: updated.priorities,
+      constraints: updated.constraints });
+    setFarmDraft(farmDraftOf(updated));
+    setLastSaved(t("Saved {name}.", { name: updated.name }));
+    return updated;
+  }, [farm, farmDirty]);
 
   return {
     farm, loadError, farmDraft, drafts, selectedId, drawing, saving, saveError, busy, fieldError, dirty, lastSaved,
@@ -277,7 +318,7 @@ export function useFarmProfile(farmId: string | null) {
         setFarmDraft((prev) => prev && { ...prev, ...patch });
         setSaveError(null);
       },
-      save, deleteField, prefillSoil, addCropHistory, deleteCropHistory,
+      save, deleteField, prefillSoil, addCropHistory, deleteCropHistory, saveFieldChange, saveFarmChange, saveCropHistory,
     },
   };
 }

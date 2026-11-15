@@ -24,8 +24,8 @@ test("opens on the 2012 replay with a cautious finding on West Field", async ({ 
   if (isPhone(page)) await page.getByRole("tab", { name: "Fields" }).click();
   const fields = isPhone(page) ? page.getByRole("region", { name: "Command Center" }) : page.getByRole("complementary", { name: "Fields" });
   // Creek's crop-map points agree; West's do not (amendment 2: "Mixed" labels).
-  await expect(fields.getByText(/^Corn · /)).toBeVisible();
-  await expect(fields.getByText(/^Mixed: Corn and Grassland\/Pasture · /)).toBeVisible();
+  await expect(fields.getByText(/^Corn \(2012 crop map\) · /)).toBeVisible();
+  await expect(fields.getByText(/^Mixed: Corn and Grassland\/Pasture \(2012 crop map\) · /)).toBeVisible();
   await expect(fields.getByText("observed").first()).toBeVisible();
   await expect(fields.getByText("modelled").first()).toBeVisible();
   await expect(page.getByText(/^\d findings?$/)).toBeVisible();

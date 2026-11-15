@@ -52,7 +52,7 @@ If port 8000 is taken, run the API on another port and start Vite with
 | Units | top bar Metric / US | numbers stay metric in the API; sentences follow `units` in the request |
 | Explanations + tour | (i) buttons, ? in top bar | tour starts once on first desktop visit (`agromind.tour.simulator-v1` in localStorage) |
 | Report | Results footer > Report | print view, "Save as PDF" in the browser |
-| AI advisor | top bar > Ask the advisor | `shared/advisor`, Claude (`claude-opus-5-5`), answers only from numbered facts and cites them; needs `ANTHROPIC_API_KEY` or `LLM_API_KEY` |
+| AI advisor | top bar > Ask the advisor, or Ctrl+K | the assistant (`docs/modules/assistant.md`): sets the inputs and runs in words ("2 °C hotter, full irrigation"), answers only from numbered facts and cites them; needs `LLM_API_KEY` in `.env` |
 
 ---
 
@@ -226,14 +226,14 @@ frontend/src/
     ├── types.ts              mirrors schemas.py
     ├── api/simulatorApi.ts
     ├── state/useSimulator.ts one reducer: options, draft, result, stale flag, saved runs
+    ├── state/useAssistantBridge.ts  lets the assistant set the inputs and run (data-assist="sim.*" marks the controls)
     ├── lib/                  format.ts, rotationColors.ts
     ├── pages/SimulatorPage.tsx  desktop: map + two floating panels; < 1024 px: map + tabbed sheet
     └── components/
         ├── SetupPanel.tsx         field, RotationBuilder, ScenarioControls, PriorityControls, Run
         ├── ResultsPanel.tsx       RecommendationBlock + tabs Compare / Seasons / Assumptions / Saved
         ├── ChangeVsToday.tsx, ClimateCompare.tsx, IndicatorBars.tsx, WeatherYearsChart.tsx
-        ├── SeasonTable.tsx, AssumptionsList.tsx, SavedRuns.tsx
-        └── AdvisorDrawer.tsx      the facts the advisor may use (advisor not connected yet)
+        └── SeasonTable.tsx, AssumptionsList.tsx, SavedRuns.tsx
 ```
 
 Behaviour worth knowing:
@@ -255,7 +255,7 @@ horizontal scroll on phones.
 | Soil | CropTwin soil layers, else the field's texture class, else assumed loam (said in the UI) | **Connected** |
 | Daily weather | `shared/connectors/nasa_power.py` | Not built yet: `ports.load_climate` uses the committed sample for the demo cell, live POWER with a disk cache elsewhere |
 | Saved runs | `shared/db` | **Connected**: table `simulation_runs` (migration 0002), `store.py` |
-| AI answers | `shared/advisor` | Not built yet: `POST .../advisor-context` returns the facts; the UI shows them |
+| AI answers | `modules/assistant` | **Connected**: the assistant runs simulations through `service.py` and answers from `advisor.py`'s facts |
 
 Every service function takes the request's database session, like CropTwin's.
 

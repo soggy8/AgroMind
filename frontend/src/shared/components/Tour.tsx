@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { t } from "../i18n";
 
 export interface TourStep {
   target: string; // value of a data-tour attribute
@@ -69,15 +70,15 @@ export function Tour({ id, steps, onClose }: { id: string; steps: TourStep[]; on
         style={{ top: rect.top - pad, left: rect.left - pad, width: rect.width + pad * 2, height: rect.height + pad * 2,
           boxShadow: "0 0 0 9999px rgb(0 0 0 / .55)" }} />
       <div className="glass anim-in absolute w-[320px] p-4" style={{ left, top: below ? rect.bottom + 14 : undefined, bottom: below ? undefined : window.innerHeight - rect.top + 14 }}>
-        <div className="text-[12px] font-semibold text-mut">Step {i + 1} of {available.length}</div>
-        <h2 id="tour-title" className="mt-1 text-[16px] font-bold">{step.title}</h2>
-        <p className="mt-1 text-[13px] leading-normal text-tx/90">{step.body}</p>
+        <div className="text-[12px] font-semibold text-mut">{t("Step {v} of {length}", { v: i + 1, length: available.length })}</div>
+        <h2 id="tour-title" className="mt-1 text-[16px] font-bold">{t(step.title)}</h2>
+        <p className="mt-1 text-[13px] leading-normal text-tx/90">{t(step.body)}</p>
         <div className="mt-3 flex items-center justify-between">
-          <button type="button" onClick={finish} className="text-[13px] font-semibold text-mut hover:text-tx">Skip tour</button>
+          <button type="button" onClick={finish} className="text-[13px] font-semibold text-mut hover:text-tx">{t("Skip tour")}</button>
           <div className="flex gap-2">
-            {i > 0 && <button type="button" onClick={() => setI(i - 1)} className="rounded-ctl border border-line bg-glass-hi px-3 py-1.5 text-[13px] font-semibold">Back</button>}
+            {i > 0 && <button type="button" onClick={() => setI(i - 1)} className="rounded-ctl border border-line bg-glass-hi px-3 py-1.5 text-[13px] font-semibold">{t("Back")}</button>}
             <button type="button" autoFocus onClick={() => (last ? finish() : setI(i + 1))} className="btn-primary px-3 py-1.5 text-[13px]">
-              {last ? "Done" : "Next"}
+              {last ? t("Done") : t("Next")}
             </button>
           </div>
         </div>

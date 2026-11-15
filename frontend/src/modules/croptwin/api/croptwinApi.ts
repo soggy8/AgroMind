@@ -4,10 +4,12 @@
  * Request and response shapes are in ../types.ts, which mirrors backend schemas.py: change both together.
  */
 import { ApiError, http } from "../../../shared/api/http";
+import { acceptLanguage } from "../../../shared/i18n";
 import type {
-  ColourReading, CropHistoryIn, FarmCreate, FarmOut, FarmSummary, FarmUpdate, FieldCreate, FieldOut, FieldUpdate, PlaceSearch,
+  AdvisorContext, ColourReading, CropHistoryIn, FarmCreate, FarmOut, FarmSummary, FarmUpdate, FieldCreate, FieldOut, FieldUpdate, PlaceSearch,
   SoilLayerIn, WeatherOut,
 } from "../types";
+import { t } from "../../../shared/i18n";
 
 /**
  * PATCH and PUT, which shared/api/http.ts doesn't have yet. Same error handling as http.ts;
@@ -16,9 +18,9 @@ import type {
 async function send<T>(method: "PATCH" | "PUT", path: string, body: unknown): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    res = await fetch(path, { method, headers: { "Content-Type": "application/json", "Accept-Language": acceptLanguage() }, body: JSON.stringify(body) });
   } catch {
-    throw new ApiError(0, "Couldn't reach the AgroMind server. Check that the backend is running.");
+    throw new ApiError(0, t("Couldn't reach the AgroMind server. Check that the backend is running."));
   }
   if (!res.ok) {
     let detail = res.statusText;
@@ -50,6 +52,8 @@ export const croptwinApi = {
   fieldWeather: (farmId: string, fieldId: string, signal?: AbortSignal) =>
     http.get<WeatherOut>(`${field(farmId, fieldId)}/weather`, signal),
   getFarm: (farmId: string, signal?: AbortSignal) => http.get<FarmOut>(farm(farmId), signal),
+  /** The facts the AI advisor may use, built by the backend from the saved farm profile. */
+  advisorContext: (farmId: string, signal?: AbortSignal) => http.get<AdvisorContext>(`${farm(farmId)}/advisor-context`, signal),
   updateFarm: (farmId: string, body: FarmUpdate) => send<FarmOut>("PATCH", farm(farmId), body),
   createField: (farmId: string, body: FieldCreate) => http.post<FieldOut>(`${farm(farmId)}/fields`, body),
   deleteField: (farmId: string, fieldId: string) => http.del(field(farmId, fieldId)),

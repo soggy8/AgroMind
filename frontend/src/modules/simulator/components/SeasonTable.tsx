@@ -4,11 +4,12 @@ import { useUnits } from "../../../shared/units";
 import { pct, pctRange } from "../lib/format";
 import { rotationColor } from "../lib/rotationColors";
 import type { CropOption, SeasonResult, SimulationResult } from "../types";
+import { t } from "../../../shared/i18n";
 
 const LIMIT = {
-  water: { icon: Droplets, label: "water-limited", cls: "text-rain" },
-  heat: { icon: Thermometer, label: "heat-limited", cls: "text-heat" },
-  rotation: { icon: Repeat, label: "follows itself", cls: "text-soil" },
+  water: { icon: Droplets, label: t("water-limited"), cls: "text-rain" },
+  heat: { icon: Thermometer, label: t("heat-limited"), cls: "text-heat" },
+  rotation: { icon: Repeat, label: t("follows itself"), cls: "text-soil" },
 } as const;
 
 /** Season by season: what is planted when, and how each season fares across weather years. */
@@ -18,7 +19,7 @@ export function SeasonTable({ result, crops }: { result: SimulationResult; crops
   return (
     <section aria-labelledby="seasons-h" className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 id="seasons-h" className="text-[15px] font-bold">Season by season</h3>
+        <h3 id="seasons-h" className="text-[15px] font-bold">{t("Season by season")}</h3>
         <KindTag kind="modelled" />
       </div>
       {rots.map((r) => (
@@ -33,8 +34,7 @@ export function SeasonTable({ result, crops }: { result: SimulationResult; crops
         </div>
       ))}
       <p className="text-[12px] leading-snug text-mut">
-        Yield as a share of the crop&apos;s typical yield in today&apos;s climate; range across {result.ensemble_size} weather years.
-        Icons show the main limit in a median year.
+        {t("Yield as a share of the crop's typical yield in today's climate; range across {ensemble_size} weather years. Icons show the main limit in a median year.", { ensemble_size: result.ensemble_size })}
       </p>
     </section>
   );
@@ -45,19 +45,19 @@ function SeasonRow({ s, cropName }: { s: SeasonResult; cropName: string }) {
   const limit = s.limiting_factor === "none" ? null : LIMIT[s.limiting_factor];
   return (
     <li className="grid grid-cols-[52px_1fr_auto] items-center gap-2 rounded-chip bg-glass-hi px-2.5 py-2">
-      <span className="text-[12px] font-bold text-mut">Year {s.year}</span>
+      <span className="text-[12px] font-bold text-mut">{t("Year {year}", { year: s.year })}</span>
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 text-sm font-semibold">
           {cropName}
           {limit && (
             <span className={`inline-flex items-center gap-1 text-[12px] font-semibold ${limit.cls}`}>
-              <limit.icon size={13} strokeWidth={1.75} aria-hidden />{limit.label}
+              <limit.icon size={13} strokeWidth={1.75} aria-hidden />{t(limit.label)}
             </span>
           )}
         </span>
         <span className="block text-[12px] text-mut">
-          {s.plant_date} – {s.harvest_date} · needs {u.water(s.crop_water_need_mm.p50)}
-          {s.irrigation_mm.p50 >= 1 && <> · irrigated {u.water(s.irrigation_mm.p50)}</>}
+          {t("{plant_date} – {harvest_date} · needs {water}", { plant_date: s.plant_date, harvest_date: s.harvest_date, water: u.water(s.crop_water_need_mm.p50) })}
+          {s.irrigation_mm.p50 >= 1 && <> {t("· irrigated {water}", { water: u.water(s.irrigation_mm.p50) })}</>}
         </span>
       </span>
       <span className="text-right">

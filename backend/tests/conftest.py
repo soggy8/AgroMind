@@ -27,3 +27,10 @@ def client(db_session):
     app.dependency_overrides[get_session] = lambda: db_session
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_llm(monkeypatch):
+    """Tests never call a real LLM: .env may hold a real key, and the free tier's quota is small."""
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "llm_api_key", "")
