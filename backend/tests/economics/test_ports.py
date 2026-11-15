@@ -8,6 +8,7 @@ def test_field_info_and_suggestions(db):
     f = ports.field_info(db, "demo", "north")
     assert f.field_id == "north" and f.area_ha > 0
     assert [r.id for r in ports.suggested_rotations(db, "demo")] == ["A", "B", "C"]
+    assert ports.known_crops(db, "demo") >= {"maize", "soybean", "oats", "winter_wheat", "sunflower"}
 
 
 def test_run_shapes(db):

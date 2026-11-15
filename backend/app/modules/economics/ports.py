@@ -60,32 +60,32 @@ class Run:
     model_version: str
 
 
-def field_info(session: Session, farm_id: str, field_id: str) -> FieldInfo:
+def _options(session: Session, farm_id: str):
     try:
-        options = simulator.get_options(session, farm_id)
+        return simulator.get_options(session, farm_id)
     except simulator.NotFound as e:
         raise NotFound(str(e)) from e
-    for f in options.fields:
+
+
+def field_info(session: Session, farm_id: str, field_id: str) -> FieldInfo:
+    for f in _options(session, farm_id).fields:
         if f.id == field_id:
             return FieldInfo(field_id=f.id, name=f.name, area_ha=f.area_ha, current_crop_id=f.crop_id)
     raise NotFound(f"No field '{field_id}' on farm '{farm_id}'.")
 
 
 def suggested_rotations(session: Session, farm_id: str) -> list[RotationInput]:
-    try:
-        options = simulator.get_options(session, farm_id)
-    except simulator.NotFound as e:
-        raise NotFound(str(e)) from e
     return [RotationInput(id=r.id, name=r.name, crops=list(r.crops), cover_crop=r.cover_crop)
-            for r in options.suggested_rotations]
+            for r in _options(session, farm_id).suggested_rotations]
+
+
+def known_crops(session: Session, farm_id: str) -> frozenset[str]:
+    """Ids of every crop in the Simulator's catalogue, with or without price and cost data."""
+    return frozenset(c.id for c in _options(session, farm_id).crops)
 
 
 def projection(session: Session, farm_id: str, projection_id: str) -> ProjectionDelta:
-    try:
-        options = simulator.get_options(session, farm_id)
-    except simulator.NotFound as e:
-        raise NotFound(str(e)) from e
-    for p in options.projections:
+    for p in _options(session, farm_id).projections:
         if p.id == projection_id:
             return ProjectionDelta(id=p.id, label=f"NASA {p.period}, {p.ssp_name}",
                                    temp_change_c=p.temp_change_c["median"],

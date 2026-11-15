@@ -32,3 +32,7 @@ def test_errors(api):
     assert api.post("/api/farms/nope/economics/report", json={"field_id": "north"}).status_code == 404
     wheat = [{"id": "W", "name": "Wheat", "crops": ["winter_wheat"]}]
     assert api.post(f"{ECON}/report", json={"field_id": "north", "rotations": wheat}).status_code == 422
+    banana = api.post(f"{ECON}/report", json={"field_id": "north", "rotations": ROTS[:1] + [
+        {"id": "Z", "name": "Banana", "crops": ["banana"]}]})
+    assert banana.status_code == 422
+    assert banana.json()["detail"] == "Banana includes 'banana', which isn't a known crop."

@@ -64,8 +64,9 @@ def test_bad_years():
 
 
 def test_bad_years_every_season_and_cap_at_nine():
-    assert s.bad_years("M", 0.96, -300, 0, "metric").startswith("M loses money in about 9 of every 10 simulated seasons;")
-    assert s.bad_years("M", 0.999, -300, 0, "metric").startswith("M loses money in about 9 of every 10 simulated seasons;")
+    nine = "M loses money in about 9 of every 10 simulated seasons;"
+    assert s.bad_years("M", 0.96, -300, 0, "metric").startswith(nine)
+    assert s.bad_years("M", 0.999, -300, 0, "metric").startswith(nine)
     assert s.bad_years("M", 1.0, -300, 900, "metric") == (
         "M loses money in every simulated season; the worst season loses $300/ha."
         " Getting through the worst run of seasons takes about $900/ha in cash.")
@@ -75,7 +76,8 @@ TODAY = {"warming_c": 0.0, "rain_change_pct": 0.0, "price_change_pct": 0.0, "pri
 
 
 def sp(origin="A", warming=None, price=None, everywhere=False, others=True, warming_tie=None, price_tie=None):
-    return SwitchPoints(origin, warming, price, everywhere, others, warming_tie_from=warming_tie, price_tie_from=price_tie)
+    return SwitchPoints(origin, warming, price, everywhere, others,
+                        warming_tie_from=warming_tie, price_tie_from=price_tie)
 
 
 def test_switch_cases_in_todays_climate_at_todays_prices():
@@ -114,7 +116,8 @@ def test_switch_names_tie_rows_before_the_switch():
 def test_switch_says_todays_climate_only_when_it_is():
     dry = {**TODAY, "rain_change_pct": -20.0}
     assert s.switch(sp(None), NAMES, "A", **dry) == (
-        f"In today's temperatures with 20% less rain at today's prices, {Y} and the next rotation are too close to call.")
+        f"In today's temperatures with 20% less rain at today's prices, {Y} and the next rotation"
+        " are too close to call.")
     assert s.switch(sp(warming=(1.0, 4.0), warming_tie=2.0), NAMES, "A", **dry) == (
         f"{Y} is too close to call from +2 °C and stops earning most by +4 °C with 20% less rain at today's prices.")
     assert s.switch(sp(price=(0.0, -15.0)), NAMES, "A", **dry) == (

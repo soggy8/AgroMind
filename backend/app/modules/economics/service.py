@@ -1,7 +1,7 @@
 """Economics orchestration: run the Simulator through the port and assemble the money report.
 
 The only file other modules may import. The maths is in money.py, the text in sentences.py, and the
-Simulator is reached only through `port` (ports.py by default; tests pass a fake with the same four
+Simulator is reached only through `port` (ports.py by default; tests pass a fake with the same five
 functions). Results are Modelled, money inputs Scenario, and field area Observed (spec section 10).
 """
 from __future__ import annotations
@@ -50,6 +50,34 @@ def _no_data(crop_ids: list[str]) -> str:
 
 def _unpriced(crops: list[str]) -> list[str]:
     return list(dict.fromkeys(c for c in crops if c not in CROP_MONEY))
+
+
+def _not_known(crop_ids: list[str], which: bool = False) -> str:
+    """"'banana' isn't a known crop", or "'banana', which isn't a known crop" after a rotation name."""
+    quoted = [f"'{c}'" for c in crop_ids]
+    joined = quoted[0] if len(quoted) == 1 else ", ".join(quoted[:-1]) + " and " + quoted[-1]
+    verb = "isn't a known crop" if len(quoted) == 1 else "aren't known crops"
+    return f"{joined}, which {verb}" if which else f"{joined} {verb}"
+
+
+def _check_known_crops(session: Session, farm_id: str, req: EconomicsRequest, rotations: list[RotationInput],
+                       port) -> None:
+    """A crop id outside the Simulator's catalogue is a mistake in the request (422), not an unpriced crop."""
+    your = req.your_numbers
+    named = [c for r in rotations for c in r.crops] + list(your.prices_usd_t) + list(your.costs_before_rent_usd_ha)
+    if not _unpriced(named + ([req.price_crop] if req.price_crop else [])):
+        return  # every priced crop is in the catalogue
+    known = port.known_crops(session, farm_id)
+    for r in rotations:
+        unknown = [c for c in _unpriced(r.crops) if c not in known]
+        if unknown:
+            raise InvalidRequest(f"{r.name} includes {_not_known(unknown, which=True)}.")
+    for kind, given in (("price", your.prices_usd_t), ("cost", your.costs_before_rent_usd_ha)):
+        unknown = [c for c in _unpriced(list(given)) if c not in known]
+        if unknown:
+            raise InvalidRequest(f"{_not_known(unknown)}, so your own {kind} can't be used.")
+    if req.price_crop is not None and req.price_crop not in known:
+        raise InvalidRequest(f"{_not_known([req.price_crop])}, so the price change can't be applied to it alone.")
 
 
 # ---------- money inputs ----------
@@ -186,12 +214,18 @@ def _stat(values: np.ndarray, unit: str) -> Stat:
     return Stat(p10=_usd(q.p10), p50=_usd(q.p50), p90=_usd(q.p90), unit=unit)
 
 
-def _sources(rotations: list[RotationInput], inputs: list[MoneyInput], *extra: str) -> list[str]:
-    """Price, yield and cost sources of the rotations' crops, then rent and any extras: de-duplicated, in order."""
+def _sources(rotations: list[RotationInput], inputs: list[MoneyInput], irrigated: bool, *extra: str) -> list[str]:
+    """Price, yield and cost sources of the rotations' crops, then rent, the cover crop when any rotation has
+    one, irrigation when the scenario irrigates, and any extras: de-duplicated, in order."""
     src = {i.id: i.source for i in inputs}
     ids = [i for r in rotations for c in r.crops for i in (f"price.{c}", f"yield.{c}", f"cost.{c}", f"cost_after_self.{c}")
            if i in src]
-    return list(dict.fromkeys([src[i] for i in ids] + [src["rent"]] + list(extra)))
+    out = [src[i] for i in ids] + [src["rent"]]
+    if any(r.cover_crop for r in rotations):
+        out.append(src["cover_crop"])
+    if irrigated:
+        out += [src["irrigation"], IRRIGATION_P50_SOURCE]
+    return list(dict.fromkeys(out + list(extra)))
 
 
 # ---------- blocks (spec section 6.4) ----------
@@ -210,11 +244,13 @@ def _best_alternative(yours: RotationInput, priced: list[RotationInput], scen: d
 
 def _climate_bill(req: EconomicsRequest, yours: RotationInput, priced: list[RotationInput], area_ha: float,
                   today: dict[str, np.ndarray], scen: dict[str, np.ndarray], other: dict[str, np.ndarray],
-                  label: str, sources: list[str]) -> ClimateBill:
-    change = _stat(scen[yours.id] - today[yours.id], ANNUAL)  # paired by weather track
-    whole = Stat(p10=_usd(change.p10 * area_ha), p50=_usd(change.p50 * area_ha), p90=_usd(change.p90 * area_ha),
-                 unit=WHOLE_FIELD)
+                  label: str, inputs: list[MoneyInput]) -> ClimateBill:
+    paired = scen[yours.id] - today[yours.id]  # paired by weather track
+    change = _stat(paired, ANNUAL)
+    whole = _stat(paired * area_ha, WHOLE_FIELD)  # from the unrounded change
     best = _best_alternative(yours, priced, scen, change.p50)
+    block = [yours] + [r for r in priced if best is not None and r.id == best.rotation_id]
+    sources = _sources(block, inputs, req.scenario.irrigation != "none")
     sentence = sentences.climate_bill(yours.name, label, change.p50, best.name if best else None,
                                       best.wins_back_usd_ha if best else None,
                                       best.wins_back_share if best else None, req.units)
@@ -243,7 +279,7 @@ def _nearest(values: list[float], target: float) -> int:
 
 
 def _grid(req: EconomicsRequest, yours: RotationInput, pricing: _Pricing, row_runs: list[ports.Run],
-          rain: float, rain_source: str, warming: float, sources: list[str]) -> WhoEarnsMost:
+          rain: float, rain_source: str, warming: float, projected: bool, sources: list[str]) -> WhoEarnsMost:
     g = req.grid
     cells: list[list[GridCell]] = []
     for run in row_runs:  # rows are warming levels; prices change by arithmetic, so only rows need runs
@@ -255,7 +291,8 @@ def _grid(req: EconomicsRequest, yours: RotationInput, pricing: _Pricing, row_ru
                                 margin_p50_usd_ha={k: _usd(v) for k, v in p50.items()}))
         cells.append(row)
     r, c = _nearest(g.warming_c, warming), _nearest(g.price_change_pct, req.price_change_pct)
-    exact = g.warming_c[r] == warming and g.price_change_pct[c] == req.price_change_pct
+    # a grid row only approximates a projection: uniform warming and the May-Sep median rain change
+    exact = not projected and g.warming_c[r] == warming and g.price_change_pct[c] == req.price_change_pct
     winners = [[cell.winner_rotation_id for cell in row] for row in cells]
     sp = money.switch_points(winners, g.warming_c, g.price_change_pct, yours.id)
     sentence = sentences.switch(
@@ -282,7 +319,7 @@ def _assumptions(req: EconomicsRequest, priced: list[RotationInput], yours: Rota
                                 "per ha, pumping and energy only.", source=IRRIGATION_SOURCE))
         a.append(Assumption(topic="Irrigation per weather year", text="Every weather year is costed with the season's "
                             "median (p50) irrigation, because the Simulator reports irrigation per season, not per "
-                            "year. Rain-fed results are exact.", source=IRRIGATION_P50_SOURCE))
+                            "year. Rain-fed results are not affected.", source=IRRIGATION_P50_SOURCE))
     if any(r.cover_crop for r in priced) and your.cover_crop_usd_ha is None:
         a.append(Assumption(topic="Cover-crop cost", text=f"Cereal rye costs {_per_acre(COVER_CROP_USD_HA)} in every "
                             "season of a rotation with a cover crop.", source=COVER_CROP_SOURCE))
@@ -322,10 +359,11 @@ def _split_priced(rotations: list[RotationInput]) -> tuple[list[RotationInput], 
 
 def build_report(session: Session, farm_id: str, req: EconomicsRequest, *, port=ports) -> EconomicsReport:
     field = port.field_info(session, farm_id, req.field_id)
+    rotations, yours_assumed = _resolve_rotations(session, farm_id, req, port)
+    _check_known_crops(session, farm_id, req, rotations, port)
     m, inputs = resolve_inputs(req.your_numbers)
     if req.price_crop is not None and req.price_crop not in CROP_MONEY:
         raise InvalidRequest(f"{_cap(_no_data([req.price_crop]))}, so the price change can't be applied to it alone.")
-    rotations, yours_assumed = _resolve_rotations(session, farm_id, req, port)
     yours = rotations[0]
     priced, excluded = _split_priced(rotations)
     sc = req.scenario
@@ -350,20 +388,21 @@ def build_report(session: Session, farm_id: str, req: EconomicsRequest, *, port=
     other = pricing.annual(pricing.seasons(run([yours], heat_response=_other_heat_response(sc.heat_response)), pct,
                                            [yours]))
 
-    bill = _climate_bill(req, yours, priced, field.area_ha, today, scen, other, label, _sources([yours], inputs))
-    bad = [_bad_years(r, scen_seasons[r.id], sc.years, req.units, _sources([r], inputs)) for r in priced]
+    irrigated = sc.irrigation != "none"
+    bill = _climate_bill(req, yours, priced, field.area_ha, today, scen, other, label, inputs)
+    bad = [_bad_years(r, scen_seasons[r.id], sc.years, req.units, _sources([r], inputs, irrigated)) for r in priced]
 
     grid = None
     if has_grid:
         rain_source = "the projection's May-Sep median rain change" if proj else "the scenario's rain change"
         rows = [run(priced, temp_delta_c=w, rain_change_pct=rain, projection=None) for w in req.grid.warming_c]
         grid = _grid(req, yours, pricing, rows, rain, rain_source, proj.temp_change_c if proj else sc.temp_delta_c,
-                     _sources(priced, inputs, NEAR_TIE_SOURCE))
+                     proj is not None, _sources(priced, inputs, irrigated, NEAR_TIE_SOURCE))
 
     notes = [sentences.CAVEAT, sentences.OWN_LAND if req.your_numbers.land == "own" else sentences.RENT_LAND]
     if grid is None:
         notes.append(NO_GRID_NOTE)
-    if not scen_run.calibrated:
+    if not scen_run.calibrated and "uncalibrated" not in scen_run.data_note.lower():  # one calibration note
         notes.append(sentences.NOT_CALIBRATED)
     if scen_run.data_note:
         notes.append(scen_run.data_note)

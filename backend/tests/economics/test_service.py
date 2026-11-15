@@ -9,12 +9,12 @@ import numpy as np
 import pytest
 
 from app.modules.economics import money, ports, service
-from app.modules.economics.parameters import (CROP_MONEY, DEFAULT_YOURS_SOURCE, NEAR_TIE_SOURCE, RENT_SOURCE,
-                                              RENT_USD_HA)
-from app.modules.economics.schemas import EconomicsRequest, EconScenario, RotationInput, YourNumbers
+from app.modules.economics.parameters import (COVER_CROP_SOURCE, CROP_MONEY, DEFAULT_YOURS_SOURCE, IRRIGATION_SOURCE,
+                                              NEAR_TIE_SOURCE, RENT_SOURCE, RENT_USD_HA)
+from app.modules.economics.schemas import EconomicsRequest, EconScenario, GridSpec, RotationInput, YourCell, YourNumbers
 from app.modules.economics.sentences import CAVEAT, NOT_CALIBRATED, OWN_LAND
 
-M, S = CROP_MONEY["maize"], CROP_MONEY["soybean"]
+M, S, O = CROP_MONEY["maize"], CROP_MONEY["soybean"], CROP_MONEY["oats"]
 RM, RS = M.price_usd_t * M.typical_yield_t_ha, S.price_usd_t * S.typical_yield_t_ha  # revenue at relative yield 1
 CM, CS = M.cost_before_rent_usd_ha + RENT_USD_HA, S.cost_before_rent_usd_ha + RENT_USD_HA  # cost incl. rent
 
@@ -27,13 +27,17 @@ SS = RotationInput(id="S", name="Continuous soybean", crops=["soybean"])
 MM = RotationInput(id="A", name="Continuous maize", crops=["maize"])
 WS = RotationInput(id="W", name="Wheat → Soybean", crops=["winter_wheat", "soybean"])
 X = RotationInput(id="X", name="Maize → Soybean, other seed", crops=["maize", "soybean"])
+RYE = RotationInput(id="R", name="Maize → Soybean → Oats + rye", crops=["maize", "soybean", "oats"], cover_crop=True)
 IRRIGATION_TOPICS = {"Irrigation cost", "Irrigation per weather year"}
 
 
 class FakePort:
-    def __init__(self, calibrated: bool = True):
-        self.calibrated = calibrated
+    def __init__(self, calibrated: bool = True, data_note: str = "Fake weather."):
+        self.calibrated, self.data_note = calibrated, data_note
         self.calls: list[tuple[EconScenario, list[str]]] = []
+
+    def known_crops(self, session, farm_id):
+        return frozenset({"maize", "soybean", "oats", "winter_wheat", "sunflower"})
 
     def field_info(self, session, farm_id, field_id):
         return ports.FieldInfo(field_id=field_id, name="North field", area_ha=AREA, current_crop_id="soybean")
@@ -56,7 +60,7 @@ class FakePort:
             yields = np.array([[b - SLOPE.get(c, 0.0) * scale * warming for b in BASE] for c in crops])
             out[r.id] = ports.RotationRun(r.id, crops, yields, (irrigation,) * len(crops), None)
         return ports.Run(rotations=out, calibrated=self.calibrated, ensemble_start_years=[2001, 2002],
-                         data_note="Fake weather.", model_version="fake-1")
+                         data_note=self.data_note, model_version="fake-1")
 
 
 class GapPort(FakePort):
@@ -109,7 +113,8 @@ def test_whole_field_uses_area():
     rep = report()
     bill = rep.climate_bill
     assert rep.area.value_ha == AREA and rep.area.kind == "observed"
-    assert bill.change_whole_field.p50 == round(bill.change.p50 * AREA)
+    change = -(0.2 * RM + 0.1 * RS) / 2  # per track, unrounded
+    assert bill.change_whole_field.p50 == round(change * AREA)  # not round(round(change) * AREA)
     assert bill.change_whole_field.unit == "USD/year" and bill.change.unit == "USD/ha/year"
 
 
@@ -187,6 +192,8 @@ def test_irrigation_assumption_only_when_irrigated():
     wet = report(scenario=EconScenario(temp_delta_c=2, years=2, irrigation="full"))
     assert not IRRIGATION_TOPICS & {a.topic for a in dry.assumptions}
     assert IRRIGATION_TOPICS <= {a.topic for a in wet.assumptions}
+    per_year = next(a for a in wet.assumptions if a.topic == "Irrigation per weather year")
+    assert per_year.text.endswith(" Rain-fed results are not affected.")
     # 100 mm a season at $0.50/mm/ha, two seasons over two years
     assert abs(wet.climate_bill.today.p50 - (dry.climate_bill.today.p50 - 50)) <= 1
 
@@ -327,3 +334,50 @@ def test_single_priced_rotation_bill_sentence():
     loss = round((0.2 * RM + 0.1 * RS) / 2)  # +2 °C: maize loses 0.2 and soybean 0.1 of a yield, over 2 years
     assert bill.sentence == (f"In this scenario (+2 °C, +0% rain), Maize → Soybean earns about ${loss:,}/ha a year"
                              " less than in today's climate. There's no other priced rotation to compare.")
+
+
+def test_block_sources_follow_the_block():
+    wet = report(rotations=[MM, RYE], scenario=EconScenario(temp_delta_c=2, years=3, irrigation="full"))
+    crops = lambda *cs: [c.sources[k] for c in cs for k in ("price", "yield", "cost")]
+    irrigation = [IRRIGATION_SOURCE, service.IRRIGATION_P50_SOURCE]
+    bill, (mm, rye), who = wet.climate_bill, wet.bad_years, wet.who_earns_most
+    assert bill.best_alternative.rotation_id == "R"  # the bill carries its margins, so its sources too
+    assert bill.sources == crops(M, S, O) + [RENT_SOURCE, COVER_CROP_SOURCE] + irrigation
+    assert mm.sources == crops(M) + [RENT_SOURCE] + irrigation
+    assert rye.sources == crops(M, S, O) + [RENT_SOURCE, COVER_CROP_SOURCE] + irrigation
+    assert who.sources == crops(M, S, O) + [RENT_SOURCE, COVER_CROP_SOURCE] + irrigation + [NEAR_TIE_SOURCE]
+    dry = report(rotations=[MM, RYE], scenario=EconScenario(temp_delta_c=2, years=3))
+    dry_sources = set(dry.climate_bill.sources + dry.who_earns_most.sources)
+    assert not {IRRIGATION_SOURCE, service.IRRIGATION_P50_SOURCE} & dry_sources
+    mine = report(rotations=[MM, RYE], scenario=EconScenario(temp_delta_c=2, years=3, irrigation="full"),
+                  your_numbers=YourNumbers(cover_crop_usd_ha=50, irrigation_usd_per_mm_ha=1))
+    # cover crop and irrigation are both "Your number", listed once
+    assert mine.climate_bill.sources[-3:] == [RENT_SOURCE, service.YOUR_NUMBER, service.IRRIGATION_P50_SOURCE]
+    assert not {COVER_CROP_SOURCE, IRRIGATION_SOURCE} & set(mine.climate_bill.sources)
+
+
+def test_projection_cell_is_never_exact():
+    proj = report(scenario=EconScenario(projection="ssp245_2050s", years=2), grid=GridSpec(warming_c=[0, 1, 2.4, 3, 4]))
+    assert proj.who_earns_most.your_cell == YourCell(row=2, col=2, exact=False)  # the fake projection warms 2.4 °C
+    assert report().who_earns_most.your_cell == YourCell(row=2, col=2, exact=True)  # +2 °C, rain 0 is a grid cell
+
+
+def test_unknown_crops_are_not_known_crops():
+    banana = RotationInput(id="Z", name="Maize → Banana", crops=["maize", "banana"])
+    with pytest.raises(service.InvalidRequest, match="^Maize → Banana includes 'banana', which isn't a known crop.$"):
+        report(rotations=[banana, MS])
+    with pytest.raises(service.InvalidRequest, match="isn't a known crop"):
+        report(rotations=[MS, banana])  # a typo in another rotation is a mistake too, not an unpriced crop
+    with pytest.raises(service.InvalidRequest, match="^'typo' isn't a known crop, so your own price can't be used.$"):
+        report(your_numbers=YourNumbers(prices_usd_t={"typo": 200}))
+    with pytest.raises(service.InvalidRequest, match="^'banana' isn't a known crop, so the price change can't be"):
+        report(price_crop="banana")
+    with pytest.raises(service.InvalidRequest, match="^Sunflower has no Iowa price and cost data"):
+        report(your_numbers=YourNumbers(costs_before_rent_usd_ha={"sunflower": 1}))  # known, just unpriced
+
+
+def test_one_calibration_note():
+    uncalibrated = "Weather. This location is outside the calibrated area, so results are uncalibrated."
+    rep = report(FakePort(calibrated=False, data_note=uncalibrated))
+    assert uncalibrated in rep.notes and NOT_CALIBRATED not in rep.notes
+    assert sum("calibrated" in n for n in rep.notes) == 1

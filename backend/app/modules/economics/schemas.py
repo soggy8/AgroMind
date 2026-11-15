@@ -74,7 +74,8 @@ class YourNumbers(BaseModel):
     def _prices_in_range(cls, v: dict[str, float]) -> dict[str, float]:
         bad = sorted(k for k, x in v.items() if not 0 < x <= MAX_PRICE_USD_T)
         if bad:
-            raise ValueError(f"prices must be greater than 0 and at most {MAX_PRICE_USD_T:,.0f} USD/t: {', '.join(bad)}")
+            raise ValueError(f"prices must be greater than 0 and at most {MAX_PRICE_USD_T:,.0f} USD/t: "
+                             f"{', '.join(bad)}")
         return v
 
     @field_validator("costs_before_rent_usd_ha")
