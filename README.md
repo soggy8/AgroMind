@@ -8,13 +8,14 @@ AgroMind is an agricultural digital twin with an interactive farm simulator. It 
 understand current field conditions, investigate possible crop stress, and compare crop rotations
 under changing climate scenarios, using NASA Earth observations, soil data, and farmer priorities.
 
-## The three modules
+## The modules
 
 | Module | Question it answers | Backend | Frontend |
 |---|---|---|---|
 | **CropTwin** | *What is my farm?* Farm profile, field boundary, soil, crop history, priorities. | `backend/app/modules/croptwin` | `frontend/src/modules/croptwin` |
 | **CropDoctor** | *What is happening on my farm now?* Indicators, anomalies vs. baseline, cautious stress explanations. | `backend/app/modules/cropdoctor` | `frontend/src/modules/cropdoctor` |
 | **Simulator** | *What could happen next?* Rotations × climate scenarios over multiple seasons, ranked by priorities. | `backend/app/modules/simulator` | `frontend/src/modules/simulator` |
+| **Economics** | *What does each option earn, and how bad do the bad years get?* The Simulator's results in money. | `backend/app/modules/economics` | central dashboard (andrej, later) |
 
 Cross-cutting pieces live in `shared/`: NASA and supporting **data connectors**, the **database**,
 and the **AI advisor** (which only explains outputs produced by the modules; it never invents data).
@@ -29,11 +30,15 @@ and the **AI advisor** (which only explains outputs produced by the modules; it 
                  ▲                 │
          ┌───────┴───────┐         │
      CropDoctor      Simulator ────┘
+                         ▲
+                         │
+                     Economics
 ```
 
 - **CropTwin** depends only on `shared`. It is the source of truth for the farm.
 - **CropDoctor** and **Simulator** read the farm through CropTwin's `service.py`, never its tables directly.
 - CropDoctor and Simulator do **not** import each other.
+- **Economics** reads the Simulator's results through the Simulator's `service.py` (and `shared`). Nothing imports Economics except through its `service.py`.
 - Modules talk to each other only through `service.py`; `router.py` is HTTP only.
 
 ## Repository layout
@@ -42,7 +47,7 @@ and the **AI advisor** (which only explains outputs produced by the modules; it 
 AgroMind/
 ├── backend/                 FastAPI (Python)
 │   ├── app/
-│   │   ├── main.py          mounts the three module routers
+│   │   ├── main.py          mounts the module routers
 │   │   ├── core/            settings / config
 │   │   ├── shared/
 │   │   │   ├── connectors/  NASA POWER, SMAP, MODIS, Landsat, GPM IMERG, SoilGrids
@@ -51,7 +56,8 @@ AgroMind/
 │   │   └── modules/
 │   │       ├── croptwin/    farm profile (models, repository)
 │   │       ├── cropdoctor/  indicators, baselines, anomalies, explanations
-│   │       └── simulator/   scenarios, rotations, engine, economics, ranking
+│   │       ├── simulator/   scenarios, rotations, engine, economics, ranking
+│   │       └── economics/   climate bill, bad-year money, who earns most (on the Simulator)
 │   └── tests/               mirrors modules/
 ├── frontend/                React + TypeScript + Tailwind
 │   └── src/
@@ -97,4 +103,5 @@ The database port is published on `127.0.0.1` only; `POSTGRES_PASSWORD` in `.env
 - Platform: settings, database layer, migrations, health check. See `docs/architecture.md`.
 - CropTwin: farm, field, soil and crop-history tables with a CRUD API at `/api/farms`.
 - Simulator: working end to end; still reads the demo farm from `ports.py`, not CropTwin.
+- Economics: backend built (`/api/farms/{farm_id}/economics`); the screens come later in the central dashboard. See `docs/modules/economics.md`.
 - CropDoctor, connectors, advisor: not started.

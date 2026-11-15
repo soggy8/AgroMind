@@ -3,8 +3,30 @@
 Module 5.5 of `AgroMind_Project_Plan.md`, "Optional Economic Intelligence", turned into a separate
 backend module that puts the Simulator's results into money.
 
-**Status (2026-11-15): designed, not built.** Owner: Kiril. Backend only for now. The screens come
-later, inside andrej's central dashboard, which calls this module's HTTP API.
+**Status (2026-11-15): built (backend only).** Owner: Kiril. The module has 46 tests and the full
+backend suite passes (109 tests). The screens come later, inside andrej's central dashboard, which
+calls this module's HTTP API. See "Run it" below.
+
+## Run it
+
+From `backend/`, with the demo farm seeded (see `README.md`):
+
+```bash
+.venv/bin/uvicorn app.main:app --port 8000
+
+# defaults: every price, cost and yield with its source, plus the suggested rotations
+curl http://localhost:8000/api/farms/demo/economics/defaults
+
+# a report with all defaults (suggested rotations, today's climate, default grid)
+curl -X POST http://localhost:8000/api/farms/demo/economics/report \
+  -H 'Content-Type: application/json' -d '{"field_id":"north"}'
+```
+
+Both return 200 and JSON. Tests: `.venv/bin/python -m pytest tests/economics` (46 tests).
+
+With the default grid on the demo farm, after the Simulator has warmed up, a report takes about
+2.1 s (limit 7 s, set by Kiril). It makes 6 Simulator runs, because identical runs are reused
+within one request (a grid row with no warming and no rain change is the same run as "today").
 
 Read with: `README.md` (module rules), `DESIGN.md` section 8 (labels), `docs/modules/simulator.md`
 (the model this module sits on), `docs/modules/simulator_calibration.md` (how far the numbers can be
@@ -132,7 +154,8 @@ margin[s,t]  = revenue[s,t] - cost[s]
 ```
 
 - `predecessor` is the previous season's crop. For season 0 it is the field's current crop
-  (`FieldOption.crop_id`). Maize after maize uses the corn-after-corn cost.
+  (`FieldOption.crop_id`). Maize after maize uses the corn-after-corn cost. When the farmer sets their own maize cost, maize
+  after maize still gets Iowa State's corn-after-corn extra cost on top of it.
 - Cover crops: the Simulator puts rye before every spring-planted season, and maize, soybean and
   oats are all spring-planted, so every priced season gets the cost. The consistency test
   (section 11) catches any change to that rule.
@@ -294,10 +317,10 @@ total cost.
   - `/defaults` and `/report` respond.
   - **Consistency**: with default numbers, rain-fed, with and without cover crops, each rotation's
     scenario `annual` p10 / p50 / p90 matches the Simulator's `Economics.margin_per_ha` within
-    $3/ha/yr. The tolerance comes from the Simulator rounding `track_seasons` to 0.001 (up to about
+    $3/ha/yr (measured: within $1/ha/yr). The tolerance comes from the Simulator rounding `track_seasons` to 0.001 (up to about
     $1.20/ha a season for maize), plus both sides rounding to whole dollars.
   - Report time with the default grid is printed and must be **at most 7 s** (Kiril, 2026-11-15),
-    measured after the Simulator has warmed up. If it's slower, make the report faster (for example by
+    measured after the Simulator has warmed up (measured: about 2.1 s). If it's slower, make the report faster (for example by
     reusing the today run for a grid row with no warming and no rain change); don't shrink the default grid.
 - `frontend`: `npm run build` passes with the new `types.ts`.
 
