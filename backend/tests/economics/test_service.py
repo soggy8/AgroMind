@@ -6,7 +6,7 @@ The fake grows one season a year (seasons == years). Each track has one relative
 import numpy as np
 import pytest
 
-from app.modules.economics import ports, service
+from app.modules.economics import money, ports, service
 from app.modules.economics.parameters import CROP_MONEY, DEFAULT_YOURS_SOURCE, RENT_USD_HA
 from app.modules.economics.schemas import EconomicsRequest, EconScenario, RotationInput, YourNumbers
 from app.modules.economics.sentences import CAVEAT, NOT_CALIBRATED, OWN_LAND
@@ -202,3 +202,17 @@ def test_defaults_and_inputs_used():
     mine = next(i for i in rep.inputs_used if i.id == "price.maize")
     assert (mine.value, mine.display, mine.source) == (190, "$190.00/t", "Your number")
     assert "Your number" in rep.climate_bill.sources
+
+
+def test_own_maize_cost_keeps_corn_after_corn_extra():
+    extra = M.cost_after_self_before_rent_usd_ha - M.cost_before_rent_usd_ha  # ISU: $686.02 - $637.98 per acre
+    m, inputs = service.resolve_inputs(YourNumbers(costs_before_rent_usd_ha={"maize": 1000}))
+    # continuous maize after soybean: season 0 is maize after soybean, season 1 maize after maize; same yield
+    seasons = money.season_margins(["maize", "maize"], "soybean", np.ones((2, 1)), [0.0, 0.0], False, m)
+    assert seasons[0, 0] - seasons[1, 0] == pytest.approx(extra)
+    after = next(i for i in inputs if i.id == "cost_after_self.maize")
+    assert after.value == round(1000 + extra, 2) and after.source == service.AFTER_SELF_SOURCE
+    default = next(i for i in service.resolve_inputs(YourNumbers())[1] if i.id == "cost_after_self.maize")
+    assert default.source == M.sources["cost"]
+    worst = report(rotations=[MM], your_numbers=YourNumbers(costs_before_rent_usd_ha={"maize": 1000})).bad_years[0]
+    assert abs(worst.worst_season_usd_ha - (0.6 * RM - (1000 + extra + RENT_USD_HA))) <= 0.5

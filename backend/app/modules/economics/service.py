@@ -25,6 +25,7 @@ InvalidRequest = ports.InvalidRequest
 WeatherUnavailable = ports.WeatherUnavailable
 
 YOUR_NUMBER = "Your number"
+AFTER_SELF_SOURCE = "Your number + ISU A1-20 (2026) corn-after-corn difference"
 ANNUAL, SEASON, WHOLE_FIELD = "USD/ha/year", "USD/ha/season", "USD/year"
 AREA_SOURCE = "CropTwin field record"
 IRRIGATION_P50_SOURCE = ("ASSUME: the Simulator's public result gives each season's irrigation as p10/p50/p90, "
@@ -64,7 +65,7 @@ def _per_acre(usd_ha: float) -> str:
 def resolve_inputs(your: YourNumbers) -> tuple[money.MoneyInputs, list[MoneyInput]]:
     """The numbers the money maths uses: the farmer's own where given, else the sourced defaults.
 
-    A farmer's own cost for a crop is used whatever came before it (so also for maize after maize).
+    A farmer's own maize cost keeps ISU's extra cost of maize after maize on top for that case.
     """
     for kind, given in (("price", your.prices_usd_t), ("cost", your.costs_before_rent_usd_ha)):
         unknown = [c for c in given if c not in CROP_MONEY]
@@ -74,13 +75,13 @@ def resolve_inputs(your: YourNumbers) -> tuple[money.MoneyInputs, list[MoneyInpu
     rows: list[MoneyInput] = []
 
     def use(id_: str, label: str, unit: str, default: float, display: str, source: str,
-            mine: float | None = None, digits: int = 2) -> float:
+            mine: float | None = None, digits: int = 2, mine_source: str = YOUR_NUMBER) -> float:
         if mine is None:
             rows.append(MoneyInput(id=id_, label=label, value=round(default, digits), unit=unit, display=display,
                                    source=source))
             return default
-        rows.append(MoneyInput(id=id_, label=label, value=mine, unit=unit, display=_metric(mine, unit),
-                               source=YOUR_NUMBER))
+        rows.append(MoneyInput(id=id_, label=label, value=round(mine, digits), unit=unit, display=_metric(mine, unit),
+                               source=mine_source))
         return mine
 
     price, typical, cost, after_self = {}, {}, {}, {}
@@ -93,9 +94,11 @@ def resolve_inputs(your: YourNumbers) -> tuple[money.MoneyInputs, list[MoneyInpu
         cost[c] = use(f"cost.{c}", f"{cm.name} cost before rent", "USD/ha", cm.cost_before_rent_usd_ha,
                       cm.display["cost"], cm.sources["cost"], own_cost)
         if cm.cost_after_self_before_rent_usd_ha is not None:
+            extra = cm.cost_after_self_before_rent_usd_ha - cm.cost_before_rent_usd_ha  # ISU's after-itself extra
             after_self[c] = use(f"cost_after_self.{c}", f"{cm.name} after {cm.name.lower()} cost before rent", "USD/ha",
                                 cm.cost_after_self_before_rent_usd_ha, _per_acre(cm.cost_after_self_before_rent_usd_ha),
-                                cm.sources["cost"], own_cost)
+                                cm.sources["cost"], None if own_cost is None else own_cost + extra,
+                                mine_source=AFTER_SELF_SOURCE)
     if your.land == "own":  # owning overrides any rent given
         rows.append(MoneyInput(id="rent", label="Cash rent", value=0.0, unit="USD/ha", display="own land",
                                source=YOUR_NUMBER))
