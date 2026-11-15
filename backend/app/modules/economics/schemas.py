@@ -21,6 +21,13 @@ HeatResponse = Literal["published", "local"]
 Land = Literal["rent", "own"]
 
 MAX_ROTATIONS = 4  # DESIGN.md section 7: one colour each from [lime, rain, water, soil]
+MAX_WARMING_ROWS = 5  # each grid row is one Simulator run; more breaks the 7 s report limit (spec section 11)
+
+# Upper bounds on the farmer's own numbers: far above any Iowa value, low enough to keep the maths finite.
+MAX_PRICE_USD_T = 10_000.0
+MAX_COST_USD_HA = 20_000.0  # cost before rent, and rent
+MAX_IRRIGATION_USD_PER_MM_HA = 100.0
+MAX_COVER_CROP_USD_HA = 5_000.0
 
 
 # ---------- inputs ----------
@@ -54,26 +61,29 @@ class RotationInput(BaseModel):
 class YourNumbers(BaseModel):
     """The farmer's own money numbers; anything left out falls back to a sourced default."""
     land: Land = "rent"
-    rent_usd_ha: float | None = Field(None, ge=0)
-    prices_usd_t: dict[str, float] = Field(default_factory=dict, description="Crop id to USD per tonne; each > 0.")
-    costs_before_rent_usd_ha: dict[str, float] = Field(default_factory=dict, description="Crop id to USD per ha; each >= 0.")
-    irrigation_usd_per_mm_ha: float | None = Field(None, ge=0)
-    cover_crop_usd_ha: float | None = Field(None, ge=0)
+    rent_usd_ha: float | None = Field(None, ge=0, le=MAX_COST_USD_HA)
+    prices_usd_t: dict[str, float] = Field(
+        default_factory=dict, description="Crop id to USD per tonne; each > 0 and <= 10,000.")
+    costs_before_rent_usd_ha: dict[str, float] = Field(
+        default_factory=dict, description="Crop id to USD per ha; each 0 to 20,000.")
+    irrigation_usd_per_mm_ha: float | None = Field(None, ge=0, le=MAX_IRRIGATION_USD_PER_MM_HA)
+    cover_crop_usd_ha: float | None = Field(None, ge=0, le=MAX_COVER_CROP_USD_HA)
 
     @field_validator("prices_usd_t")
     @classmethod
-    def _prices_positive(cls, v: dict[str, float]) -> dict[str, float]:
-        bad = sorted(k for k, x in v.items() if not x > 0)
+    def _prices_in_range(cls, v: dict[str, float]) -> dict[str, float]:
+        bad = sorted(k for k, x in v.items() if not 0 < x <= MAX_PRICE_USD_T)
         if bad:
-            raise ValueError(f"prices must be greater than 0: {', '.join(bad)}")
+            raise ValueError(f"prices must be greater than 0 and at most {MAX_PRICE_USD_T:,.0f} USD/t: "
+                             f"{', '.join(bad)}")
         return v
 
     @field_validator("costs_before_rent_usd_ha")
     @classmethod
-    def _costs_not_negative(cls, v: dict[str, float]) -> dict[str, float]:
-        bad = sorted(k for k, x in v.items() if not x >= 0)
+    def _costs_in_range(cls, v: dict[str, float]) -> dict[str, float]:
+        bad = sorted(k for k, x in v.items() if not 0 <= x <= MAX_COST_USD_HA)
         if bad:
-            raise ValueError(f"costs must not be negative: {', '.join(bad)}")
+            raise ValueError(f"costs must be between 0 and {MAX_COST_USD_HA:,.0f} USD/ha: {', '.join(bad)}")
         return v
 
 
@@ -88,7 +98,8 @@ def _sorted_unique(values: list[float], lo: float, hi: float, name: str) -> list
 
 class GridSpec(BaseModel):
     """Axes of the who-earns-most grid: rows are warming, columns are price change."""
-    warming_c: list[float] = Field(default_factory=lambda: list(DEFAULT_WARMING_C), min_length=2, max_length=7)
+    warming_c: list[float] = Field(default_factory=lambda: list(DEFAULT_WARMING_C), min_length=2,
+                                   max_length=MAX_WARMING_ROWS)
     price_change_pct: list[float] = Field(default_factory=lambda: list(DEFAULT_PRICE_STEPS_PCT), min_length=2, max_length=9)
 
     @field_validator("warming_c")
@@ -186,6 +197,7 @@ class BadYears(BaseModel):
     cash_cushion_worst_usd_ha: float
     cash_cushion_typical_usd_ha: float
     sentence: str
+    sources: list[str]
 
 
 class GridCell(BaseModel):
@@ -210,6 +222,7 @@ class WhoEarnsMost(BaseModel):
     cells: list[list[GridCell]]  # cells[row][col], rows = warming
     your_cell: YourCell
     sentence: str
+    sources: list[str]
 
 
 class ExcludedRotation(BaseModel):

@@ -13,6 +13,7 @@ import type { BadYears, ClimateBill, EconomicsDefaults, EconomicsReport, Rotatio
 const inputCls = "w-full rounded-ctl border border-line bg-glass-hi px-3 py-2 text-sm text-tx placeholder:text-mut/80 max-sm:min-h-11";
 const MINUS = "−";
 const PRICED = ["maize", "soybean", "oats"] as const;
+const YOUR_NUMBER = "Your number"; // the API's source for a farmer's own number; it stays English because the page compares it
 const CROP_NAME: Record<string, string> = { maize: t("Maize"), soybean: t("Soybean"), oats: t("Oats") };
 
 /** "$310/ha" in the chosen units; negative values get a real minus sign. */
@@ -388,11 +389,18 @@ function ClimateBillBlock({ bill, report, u }: { bill: ClimateBill; report: Econ
           ) : <dd className="text-mut">{t("No other priced rotation to compare.")}</dd>}
         </div>
       </dl>
-      <details className="mt-3 border-t border-line pt-2 text-[12px] leading-snug text-mut">
-        <summary className="cursor-pointer py-1 font-semibold hover:text-tx">{t("Sources ({n})", { n: bill.sources.length })}</summary>
-        <ul className="mt-1 list-disc space-y-1 pl-4" role="list">{bill.sources.map((x) => <li key={x}>{x}</li>)}</ul>
-      </details>
+      <Sources list={bill.sources} />
     </Glass>
+  );
+}
+
+function Sources({ list }: { list: string[] }) {
+  if (!list.length) return null;
+  return (
+    <details className="mt-3 border-t border-line pt-2 text-[12px] leading-snug text-mut">
+      <summary className="cursor-pointer py-1 font-semibold hover:text-tx">{t("Sources ({n})", { n: list.length })}</summary>
+      <ul className="mt-1 list-disc space-y-1 pl-4" role="list">{list.map((x) => <li key={x}>{x}</li>)}</ul>
+    </details>
   );
 }
 
@@ -435,6 +443,7 @@ function BadYearsBlock({ rows, colorOf, u }: { rows: BadYears[]; colorOf: (id: s
       <ul className="mt-3 space-y-1 border-t border-line pt-3 text-[13px] leading-snug text-mut" role="list">
         {rows.map((b) => <li key={b.rotation_id}>{b.sentence}</li>)}
       </ul>
+      <Sources list={[...new Set(rows.flatMap((b) => b.sources))]} />
     </Glass>
   );
 }
@@ -489,6 +498,7 @@ function GridBlock({ grid, rotations, colorOf, u }: { grid: WhoEarnsMost; rotati
           {grid.your_cell.exact ? t("your scenario") : t("nearest to your scenario")}
         </li>
       </ul>
+      <Sources list={grid.sources} />
     </Glass>
   );
 }
@@ -503,7 +513,7 @@ function InputsBlock({ report }: { report: EconomicsReport }) {
             <span className="font-semibold">{i.label}</span>
             <span className="text-right">
               <b>{i.display}</b>
-              <span className={`block max-w-[52ch] text-[12px] leading-snug ${i.source === "Your number" ? "text-lime" : "text-mut"}`}>{i.source === "Your number" ? t("Your number") : i.source}</span>
+              <span className={`block max-w-[52ch] text-[12px] leading-snug ${i.source.startsWith(YOUR_NUMBER) ? "text-lime" : "text-mut"}`}>{i.source.startsWith(YOUR_NUMBER) ? t("Your number") + i.source.slice(YOUR_NUMBER.length) : i.source}</span>
             </span>
           </li>
         ))}
