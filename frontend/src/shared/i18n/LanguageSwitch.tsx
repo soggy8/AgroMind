@@ -18,8 +18,8 @@ export function LanguageButton({ className = "" }: { className?: string }) {
   return (
     <button type="button" onClick={() => setLang(other.id)} lang={other.id}
       aria-label={other.id === "mk" ? "Префрли на македонски" : "Switch to English"} title={other.name}
-      className={`h-10 items-center gap-1 rounded-ctl px-2.5 text-[13px] font-bold text-mut hover:bg-glass-hi hover:text-tx ${className}`}>
-      <Languages size={16} strokeWidth={1.75} className="text-lime" /> {other.label}
+      className={`h-10 items-center gap-1 rounded-ctl px-2.5 text-[13px] font-medium text-mut transition-colors hover:bg-glass-hi hover:text-tx ${className}`}>
+      <Languages size={16} strokeWidth={1.5} /> {other.label}
     </button>
   );
 }

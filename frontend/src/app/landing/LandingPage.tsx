@@ -57,7 +57,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (r: Route) => void }) 
           <Logo />
           <nav aria-label={tr("Page sections")} className="ml-auto hidden items-center gap-7 md:flex">
             {NAV.map(([id, label]) => (
-              <button key={id} type="button" onClick={() => scrollTo(id)} className="text-sm font-medium text-mut hover:text-tx">{label}</button>
+              <button key={id} type="button" onClick={() => scrollTo(id)} className="text-sm font-medium text-mut transition-colors hover:text-tx">{label}</button>
             ))}
           </nav>
           <LanguageSwitch className="ml-auto md:ml-0" />
@@ -67,23 +67,23 @@ export function LandingPage({ onNavigate }: { onNavigate: (r: Route) => void }) 
         <div className="relative z-10 mx-auto flex w-full max-w-[1240px] flex-1 flex-col px-5 pb-[84vw] pt-10 sm:pb-[62vw] sm:pt-14 lg:justify-center lg:px-8 lg:pb-24 lg:pt-0">
           <div className="anim-in max-w-[720px]">
             <p className="text-[13px] font-medium text-mut">{tr("NASA Space Apps Challenge")} <span aria-hidden className="mx-1.5 text-mut/50">/</span> {tr("Field Shift")}</p>
-            <h1 id="hero-h" className="mt-5 text-[clamp(2.25rem,9.4vw,4.25rem)] font-extrabold leading-[1.02] tracking-[-.035em]">
-              <span className="sm:whitespace-nowrap">{tr("Understand your farm.")}</span><br /><span className="text-mut">{tr("Test its future.")}</span>
+            <h1 id="hero-h" className="mt-5 text-balance text-[clamp(2.25rem,9.4vw,4.25rem)] font-semibold leading-[1.04] tracking-[-.03em]">
+              <span className="sm:whitespace-nowrap">{tr("Understand your farm")}</span><br /><span className="text-mut">{tr("Test its future")}</span>
             </h1>
-            <p className="mt-6 max-w-[48ch] text-[17px] leading-[1.6] text-mut">
+            <p className="mt-6 max-w-[36rem] text-[18px] leading-[1.6] text-mut">
               {tr("AgroMind watches your fields from orbit with NASA satellites and weather records, tells you when one drifts from its own normal, and lets you test crop rotations against the climate your farm could face.")}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
               <Button variant="primary" className="!px-6 !py-3.5 !text-[15px]" onClick={() => onNavigate("overview")}>
                 {tr("Open your farm")} <ArrowRight size={16} strokeWidth={2} />
               </Button>
-              <button type="button" onClick={() => scrollTo("demo")} className="text-[15px] font-semibold text-tx underline decoration-line decoration-1 underline-offset-[6px] hover:decoration-tx">
+              <button type="button" onClick={() => scrollTo("demo")} className="text-[15px] font-medium text-tx underline decoration-line decoration-1 underline-offset-[6px] transition-colors hover:decoration-tx">
                 {tr("See it on a real season")}
               </button>
             </div>
           </div>
         </div>
-        <p className="absolute bottom-3 left-5 right-5 z-10 text-[12px] text-mut lg:left-auto lg:right-8">{tr("Earth imagery: NASA Blue Marble and Black Marble")}</p>
+        <p className="absolute bottom-4 right-8 z-10 hidden text-[12px] text-mut lg:block">{tr("Earth imagery: NASA Blue Marble and Black Marble")}</p>
       </section>
 
       <main>
@@ -95,8 +95,8 @@ export function LandingPage({ onNavigate }: { onNavigate: (r: Route) => void }) 
               <HeroMap center={health?.farm.center ?? DEMO_CENTER} fields={fields} padTopLeft={narrow ? [8, 8] : [28, 28]} padBottomRight={narrow ? [8, 8] : [28, 28]} />
               {!health && <p className="absolute inset-0 z-10 grid place-items-center text-[13px] text-mut">{tr("Loading the demo farm…")}</p>}
             </div>
-            <figcaption className="mt-2.5 text-[12.5px] leading-snug text-mut">
-              {tr("Fields coloured by greenness (NDVI)")}{period?.period_start && period.period_end ? tr(", MODIS, {day} to {day2}", { day: day(period.period_start), day2: day(period.period_end) }) : ""}{tr(". Imagery © Esri.")}
+            <figcaption className="mt-3 text-[13px] leading-5 text-mut">
+              {tr("Fields coloured by greenness (NDVI)")}{period?.period_start && period.period_end ? tr(", MODIS, {day} to {day2}", { day: day(period.period_start), day2: day(period.period_end) }) : ""}<span aria-hidden className="mx-1.5 text-mut/50">·</span>{tr("Imagery © Esri")}
             </figcaption>
           </figure>
           {health?.findings[0] && <Finding health={health} />}
@@ -107,12 +107,12 @@ export function LandingPage({ onNavigate }: { onNavigate: (r: Route) => void }) 
             {TOOLS.map((t) => (
               <li key={t.route} className="grid gap-x-8 gap-y-2 border-b border-line py-7 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)_auto] md:items-start">
                 <div>
-                  <p className="text-[13px] font-medium text-mut">{t.name}</p>
-                  <h3 className="mt-1 text-[22px] font-bold leading-snug tracking-[-.015em]">{tr(t.question)}</h3>
+                  <p className="text-[13px] text-mut">{t.name}</p>
+                  <h3 className="mt-1 text-[22px] font-medium leading-snug tracking-[-.01em]">{tr(t.question)}</h3>
                 </div>
                 <p className="text-[15px] leading-[1.6] text-mut">{tr(t.text)}</p>
                 <button type="button" onClick={() => onNavigate(t.route)} aria-label={tr("Open {name}", { name: t.name })}
-                  className="mt-2 inline-flex w-fit items-center gap-1.5 text-[15px] font-semibold text-tx hover:text-lime md:mt-1">
+                  className="mt-2 inline-flex w-fit items-center gap-1.5 text-[15px] font-medium text-tx transition-colors hover:text-lime md:mt-1">
                   {tr("Open")} <ArrowUpRight size={16} strokeWidth={1.75} />
                 </button>
               </li>
@@ -124,11 +124,11 @@ export function LandingPage({ onNavigate }: { onNavigate: (r: Route) => void }) 
           <ul className="border-t border-line">
             {SOURCES.map((s) => (
               <li key={s.name} className="grid gap-x-8 gap-y-1 border-b border-line py-4 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:items-baseline">
-                <p className="text-[15px] font-semibold">
+                <p className="text-[15px] font-medium">
                   {s.name}
-                  {s.nasa && <span className="ml-2 align-[1px] text-[11px] font-bold tracking-[.06em] text-rain">{tr("NASA")}</span>}
+                  {s.nasa && <span className="ml-2 text-[12px] font-normal text-mut">{tr("NASA")}</span>}
                 </p>
-                <p className="text-[14.5px] leading-normal text-mut">{s.use}</p>
+                <p className="text-[14px] leading-6 text-mut">{s.use}</p>
               </li>
             ))}
           </ul>
@@ -144,13 +144,13 @@ export function LandingPage({ onNavigate }: { onNavigate: (r: Route) => void }) 
             ))}
           </dl>
           <ul className="mt-8 grid gap-x-8 gap-y-4 sm:grid-cols-2">
-            {RULES.map((r) => <li key={r} className="border-l border-line pl-4 text-[14.5px] leading-[1.6] text-mut">{r}</li>)}
+            {RULES.map((r) => <li key={r} className="border-l border-line pl-4 text-[14px] leading-6 text-mut">{r}</li>)}
           </ul>
         </Section>
 
         <section aria-labelledby="cta-h" className="mx-auto max-w-[1240px] px-5 pb-24 pt-8 lg:px-8">
           <div className="border-t border-line pt-16 text-center">
-            <h2 id="cta-h" className="mx-auto max-w-[18ch] text-[clamp(2rem,6vw,3.25rem)] font-extrabold leading-[1.05] tracking-[-.03em]">{tr("Start with the demo farm.")}</h2>
+            <h2 id="cta-h" className="mx-auto max-w-[18ch] text-balance text-[clamp(2rem,6vw,3.25rem)] font-medium leading-[1.08] tracking-[-.025em]">{tr("Start with the demo farm")}</h2>
             <p className="mx-auto mt-4 max-w-[52ch] text-[16px] leading-[1.6] text-mut">
               {tr("Spot the stressed field in the 2012 drought, then test which rotation holds up if summers like that become normal.")}
             </p>
@@ -213,8 +213,8 @@ function Section({ id, title, lede, children }: { id: string; title: string; led
     <section id={id} aria-labelledby={`${id}-h`} className="mx-auto max-w-[1240px] scroll-mt-8 px-5 py-14 sm:py-20 lg:px-8">
       <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
         <div className="lg:sticky lg:top-10 lg:self-start">
-          <h2 id={`${id}-h`} className="text-[clamp(1.7rem,5.4vw,2.25rem)] font-extrabold leading-[1.1] tracking-[-.025em]">{title}</h2>
-          <p className="mt-4 max-w-[46ch] text-[15.5px] leading-[1.6] text-mut">{lede}</p>
+          <h2 id={`${id}-h`} className="text-balance text-[clamp(1.75rem,5.4vw,2.25rem)] font-medium leading-[1.12] tracking-[-.02em]">{title}</h2>
+          <p className="mt-4 max-w-[46ch] text-[15px] leading-[1.6] text-mut">{lede}</p>
         </div>
         <div className="min-w-0 space-y-8">{children}</div>
       </div>
@@ -224,7 +224,7 @@ function Section({ id, title, lede, children }: { id: string; title: string; led
 
 function Logo() {
   return (
-    <a href="#/" className="flex items-center gap-[9px] text-[19px] font-extrabold tracking-[-.01em] text-tx">
+    <a href="#/" className="flex items-center gap-2 text-[18px] font-semibold text-tx">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path d="M12 21c0-7 3-12 9-15-1 8-4 13-9 15Z" fill="var(--color-lime)" />
         <path d="M12 21C12 15 9.5 10.5 3 8c.6 7 3.6 11.4 9 13Z" fill="var(--color-rain)" />
@@ -244,16 +244,16 @@ function Finding({ health }: { health: FarmHealth }) {
           {f.severity === "alert" ? tr("Alert") : tr("Watch")} <span aria-hidden className="mx-1 text-mut/50">/</span>
           <span className="text-mut"> {tr("{field_name}, since {day}", { field_name: f.field_name, day: day(f.since) })}</span>
         </p>
-        <h3 className="mt-1.5 text-[24px] font-bold leading-snug tracking-[-.015em]">{f.headline}</h3>
+        <h3 className="mt-2 text-[24px] font-medium leading-snug tracking-[-.01em]">{f.headline}</h3>
         <p className="mt-3 text-[15px] leading-[1.6] text-mut">{f.summary} {f.explanations[0]?.text}</p>
         {f.explanations[0] && (
-          <p className="mt-3 border-l-2 border-watch-fill pl-3.5 text-[15px] leading-[1.6]">
-            <span className="font-semibold">{tr("Suggested check.")}</span> {f.explanations[0].check}
+          <p className="mt-3 border-l-2 border-watch-fill pl-4 text-[15px] leading-[1.6]">
+            <span className="font-medium">{tr("Suggested check")}</span><span aria-hidden className="mx-1.5 text-mut/50">·</span> {f.explanations[0].check}
           </p>
         )}
         <p className="mt-3 text-[13px] text-mut">{f.caveat}</p>
       </div>
-      <table className="h-fit w-full text-[14.5px]">
+      <table className="h-fit w-full text-[14px] tabular-nums">
         <caption className="pb-2 text-left text-[13px] font-medium text-mut">
           {health.is_replay ? tr("Replay of {day}", { day: day(health.as_of) }) : tr("As of {day}", { day: day(health.as_of) })}{tr(", against the 10-year normal")}
         </caption>
@@ -276,8 +276,8 @@ function Evidence({ e }: { e: Indicator }) {
       <th scope="row" className="py-3 pr-3 text-left font-medium" title={v.source}>
         <i aria-hidden className={`mr-2.5 inline-block h-2 w-2 rounded-full align-middle ${hue}`} />{tr(e.label)}
       </th>
-      <td className="whitespace-nowrap py-3 text-right font-bold">{val}</td>
-      <td className="w-[76px] whitespace-nowrap py-3 text-right text-[13.5px] font-semibold text-mut">{diff ?? ""}</td>
+      <td className="whitespace-nowrap py-3 text-right font-medium">{val}</td>
+      <td className="w-20 whitespace-nowrap py-3 text-right text-[13px] text-mut">{diff ?? ""}</td>
     </tr>
   );
 }

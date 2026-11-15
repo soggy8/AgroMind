@@ -165,7 +165,7 @@ Use **lucide-react** for icons (1.75 stroke), never emoji or text symbols.
 
 | Component | Spec |
 |---|---|
-| **Primary button** | Lime gradient `#D4F86A → #AEE03A`, `--color-lime-ink` text, 800 weight, `--radius-ctl`, neutral shadow. One per screen ("Ask the advisor", "Run simulation", "Save farm"). |
+| **Primary button** | Flat `--color-lime` with a faint top highlight, `--color-lime-ink` text, 600 weight, `--radius-ctl`, neutral shadow. One per screen ("Ask the advisor", "Run simulation", "Save farm"). |
 | **Secondary button** | `--color-glass-hi` fill, hairline border, `--color-tx` text. |
 | **Segmented tabs** | Track `rgb(0 0 0 / .25)`, 4px padding; active segment `--color-glass-sel` + inset top highlight. Used for main nav and map layers. |
 | **Farm switcher** | Select styled as secondary button: name in 600, county in `--color-mut`, chevron icon. |
@@ -173,7 +173,7 @@ Use **lucide-react** for icons (1.75 stroke), never emoji or text symbols.
 | **Indicator row** | Coloured 8px dot (indicator hue) · name · `Kind · Source` meta · value + delta · **vs-normal bar**: track `rgb(255 255 255/.08)`, fill in indicator hue, white 2px tick at the normal. |
 | **Weekly strip** | One rounded segment per week, coloured by greenness vs normal on the NDVI scale; month axis below. |
 | **Finding block** | Top section of the right panel with a warm wash `linear-gradient(170deg, rgb(255 162 58/.26), rgb(255 90 78/.10) 55%, transparent)`. Headline, severity badge (Watch / Alert, pill), "Field · since date", cautious explanation, then a hairline and the **recommended check** with a check-circle icon. |
-| **Kind tag** | Every value's label: `OBSERVED` (rain hue), `MODELLED` (soil hue), `SCENARIO` (water hue). 11.5px/800 caps, tinted fill + 1px border in the same hue. |
+| **Kind tag** | Every value's label: `Observed` (rain hue), `Modelled` (soil hue), `Scenario` (water hue). 12px/600 sentence case, tinted fill + 1px border in the same hue. |
 | **Map field** | White 2px outline (selected 2.5px), NDVI fill at ~75% opacity, dark glass name chip with value coloured by status. Fields outside the farm: dashed white outline at 35%. |
 | **Status pill (top bar)** | "1 finding": watch-tinted fill and border, coloured dot. Hidden when there are no findings. |
 
