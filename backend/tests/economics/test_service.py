@@ -3,6 +3,8 @@
 The fake grows one season a year (seasons == years). Each track has one relative yield in today's climate
 (BASE), and every °C of warming takes SLOPE off it; the "local" heat response takes half as much.
 """
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -24,6 +26,7 @@ MS = RotationInput(id="B", name="Maize → Soybean", crops=["maize", "soybean"])
 SS = RotationInput(id="S", name="Continuous soybean", crops=["soybean"])
 MM = RotationInput(id="A", name="Continuous maize", crops=["maize"])
 WS = RotationInput(id="W", name="Wheat → Soybean", crops=["winter_wheat", "soybean"])
+X = RotationInput(id="X", name="Maize → Soybean, other seed", crops=["maize", "soybean"])
 IRRIGATION_TOPICS = {"Irrigation cost", "Irrigation per weather year"}
 
 
@@ -54,6 +57,27 @@ class FakePort:
             out[r.id] = ports.RotationRun(r.id, crops, yields, (irrigation,) * len(crops), None)
         return ports.Run(rotations=out, calibrated=self.calibrated, ensemble_start_years=[2001, 2002],
                          data_note="Fake weather.", model_version="fake-1")
+
+
+class GapPort(FakePort):
+    """Rotation X is yours (B) with less maize: at today's prices it earns gap[warming] a year less than B.
+
+    Two years hold one maize season, so a maize relative yield lower by 2 x gap / RM takes gap off X's
+    annual margin; a price change p scales that to gap x (1 + p). Near ties are under $45/ha a year.
+    """
+    def __init__(self, gap: dict[float, float]):
+        super().__init__()
+        self.gap = gap
+
+    def run(self, session, farm_id, field_id, rotations, scenario, include_economics=False):
+        out = super().run(session, farm_id, field_id, rotations, scenario, include_economics)
+        if "X" in out.rotations:
+            rr = out.rotations["X"]
+            maize = [i for i, c in enumerate(rr.season_crops) if c == "maize"]
+            y = rr.track_yields.copy()
+            y[maize] -= 2 * self.gap[scenario.temp_delta_c] / RM
+            out.rotations["X"] = replace(rr, track_yields=y)
+        return out
 
 
 def report(port=None, **kw):
@@ -191,7 +215,9 @@ def test_grid_matches_climate_bill_and_applies_prices():
     plain = report().climate_bill
     assert abs(who.cells[2][zero].margin_p50_usd_ha["B"] - plain.scenario.p50) <= 1
     assert bill.scenario.p50 > plain.scenario.p50  # the requested +10 % prices reach the climate bill
-    assert who.sentence
+    # 0 °C, 0 %: Maize → Soybean about $145/ha a year, continuous soybean about $146/ha: a near tie
+    assert who.sentence == ("In today's climate at today's prices, Maize → Soybean and the next rotation"
+                            " are too close to call.")
     assert NEAR_TIE_SOURCE in who.sources and {M.sources["price"], S.sources["price"], RENT_SOURCE} <= set(who.sources)
     assert len(who.sources) == len(set(who.sources))
 
@@ -224,3 +250,45 @@ def test_own_maize_cost_keeps_corn_after_corn_extra():
     assert default.source == M.sources["cost"]
     worst = report(rotations=[MM], your_numbers=YourNumbers(costs_before_rent_usd_ha={"maize": 1000})).bad_years[0]
     assert abs(worst.worst_season_usd_ha - (0.6 * RM - (1000 + extra + RENT_USD_HA))) <= 0.5
+
+
+# 0 % column with these gaps: B, B, too close, too close, X (rows 0 to +4 °C); B everywhere on the 0 °C row
+TIE_THEN_X = {0.0: 100.0, 1.0: 100.0, 2.0: 20.0, 3.0: 20.0, 4.0: -100.0}
+
+
+def test_switch_sentence_counts_from_the_last_outright_win():
+    who = report(GapPort(TIE_THEN_X), rotations=[MS, X]).who_earns_most
+    assert [row[2].winner_rotation_id for row in who.cells] == ["B", "B", None, None, "X"]
+    assert who.sentence == ("Maize → Soybean is too close to call from +2 °C and stops earning most by +4 °C"
+                            " at today's prices.")
+
+
+def test_switch_sentence_names_the_grid_rain_change():
+    rep = report(GapPort(TIE_THEN_X), rotations=[MS, X],
+                 scenario=EconScenario(temp_delta_c=2, rain_change_pct=-20, years=2))
+    who = rep.who_earns_most
+    assert who.rain_change_pct == -20 and "today's climate" not in who.sentence
+    assert who.sentence == ("Maize → Soybean is too close to call from +2 °C and stops earning most by +4 °C"
+                            " with 20% less rain at today's prices.")
+
+
+def test_switch_sentence_ties_only_grid():
+    gap = {**TIE_THEN_X, 4.0: 20.0}  # X never wins outright
+    who = report(GapPort(gap), rotations=[MS, X]).who_earns_most
+    assert {c.winner_rotation_id for row in who.cells for c in row} == {"B", None}
+    assert who.sentence == "Maize → Soybean earns most or is too close to call everywhere on this grid."
+
+
+def test_switch_sentence_names_the_price_crop():
+    # 0 °C row: continuous soybean beats continuous maize by about $61/ha at 0 %, loses at soybean prices -15 %
+    who = report(rotations=[SS, MM], price_crop="soybean").who_earns_most
+    assert [c.winner_rotation_id for c in who.cells[0]] == ["A", "A", "S", "S", "S"]
+    assert who.sentence == ("In today's climate, Continuous soybean stops earning most when soybean prices fall"
+                            " between 0% and 15%.")
+
+
+def test_single_priced_rotation_bill_sentence():
+    bill = report(rotations=[MS, WS]).climate_bill
+    loss = round((0.2 * RM + 0.1 * RS) / 2)  # +2 °C: maize loses 0.2 and soybean 0.1 of a yield, over 2 years
+    assert bill.sentence == (f"In this scenario (+2 °C, +0% rain), Maize → Soybean earns about ${loss:,}/ha a year"
+                             " less than in today's climate. There's no other priced rotation to compare.")

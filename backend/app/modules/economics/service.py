@@ -245,10 +245,14 @@ def _grid(req: EconomicsRequest, yours: RotationInput, pricing: _Pricing, row_ru
     exact = g.warming_c[r] == warming and g.price_change_pct[c] == req.price_change_pct
     winners = [[cell.winner_rotation_id for cell in row] for row in cells]
     sp = money.switch_points(winners, g.warming_c, g.price_change_pct, yours.id)
+    sentence = sentences.switch(
+        sp, {p.id: p.name for p in pricing.rotations}, yours.id, warming_c=g.warming_c[money.nearest_zero(g.warming_c)],
+        rain_change_pct=rain, price_change_pct=g.price_change_pct[money.nearest_zero(g.price_change_pct)],
+        price_crop=CROP_MONEY[req.price_crop].name.lower() if req.price_crop else None)
     return WhoEarnsMost(
         warming_c=g.warming_c, price_change_pct=g.price_change_pct, price_crop=req.price_crop,
         rain_change_pct=rain, rain_change_source=rain_source, cells=cells, your_cell=YourCell(row=r, col=c, exact=exact),
-        sentence=sentences.switch(sp, {p.id: p.name for p in pricing.rotations}, yours.id), sources=sources)
+        sentence=sentence, sources=sources)
 
 
 def _assumptions(req: EconomicsRequest, priced: list[RotationInput], yours: RotationInput, yours_assumed: bool,

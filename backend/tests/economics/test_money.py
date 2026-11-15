@@ -45,15 +45,44 @@ def test_grid_winner_and_near_tie():
 
 W, P = [0.0, 1.0, 2.0, 3.0], [-30.0, -15.0, 0.0, 15.0]
 
-def test_switch_points_both_axes_and_ties_skipped():
+def test_switch_points_both_axes_count_from_last_outright_win():
     g = [["B", "A", "A", "A"], ["B", "A", None, "A"], ["B", "B", "B", "A"], ["B", "B", "B", "B"]]
     sp = money.switch_points(g, W, P, "A")
-    assert sp == money.SwitchPoints("A", (1.0, 2.0), (-15.0, -30.0), False)
+    # 0 % column: A wins outright at 0 °C, too close at +1 °C, B wins at +2 °C
+    assert sp == money.SwitchPoints("A", (0.0, 2.0), (-15.0, -30.0), False, True, warming_tie_from=1.0)
+
+def test_switch_points_default_grid_ties_before_the_switch():
+    # the reviewer's demo report: the 0 % column reads B, B, tie, tie, C
+    w5, p5 = [0.0, 1.0, 2.0, 3.0, 4.0], [-30.0, -15.0, 0.0, 15.0, 30.0]
+    g = [["B"] * 5, ["B"] * 5, ["B", "B", None, "B", "B"], [None] * 5, ["C"] * 5]
+    sp = money.switch_points(g, w5, p5, "B")
+    assert (sp.warming_switch, sp.warming_tie_from) == ((1.0, 4.0), 2.0)
+    assert sp.price_switch is None and sp.others_win_somewhere
+
+def test_switch_points_a_win_after_a_tie_resets_it():
+    g = [["A"] * 4, [None] * 4, ["A"] * 4, ["B"] * 4]
+    sp = money.switch_points(g, W, P, "A")
+    assert (sp.warming_switch, sp.warming_tie_from) == ((2.0, 3.0), None)
+
+def test_switch_points_ties_on_the_price_axis():
+    g = [["B", None, "A", "A"], ["A"] * 4, ["A"] * 4, ["A"] * 4]
+    sp = money.switch_points(g, W, P, "A")
+    assert (sp.price_switch, sp.price_tie_from, sp.warming_switch) == ((0.0, -30.0), -15.0, None)
 
 def test_switch_points_other_wins_at_origin_and_everywhere():
     assert money.switch_points([["B"] * 4] * 4, W, P, "A").origin_winner == "B"
     sp = money.switch_points([["A"] * 4] * 4, W, P, "A")
     assert sp.wins_everywhere and sp.warming_switch is None and sp.price_switch is None
+    assert not sp.others_win_somewhere
+
+def test_switch_points_ties_only():
+    g = [["A"] * 4, ["A", None, "A", None], [None] * 4, [None] * 4]
+    sp = money.switch_points(g, W, P, "A")
+    assert not sp.wins_everywhere and not sp.others_win_somewhere
+    assert sp.warming_switch is None and sp.price_switch is None
+
+def test_nearest_zero():
+    assert money.nearest_zero([-1.0, 0.5, 2.0]) == 1 and money.nearest_zero([-10.0, 10.0]) == 0
 
 def test_parameters_match_isu_totals_and_sources():
     for crop, total in [("maize", 911.98), ("soybean", 679.11), ("oats", 465.0)]:

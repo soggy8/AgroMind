@@ -31,10 +31,18 @@ class P3:
 
 @dataclass(frozen=True)
 class SwitchPoints:
+    """Where `yours` stops earning most, moving away from the anchor cell (the row and column nearest 0).
+
+    A switch is (last value where yours wins outright, first value where another rotation wins). When
+    near ties lie between the two, `*_tie_from` is the first tied value after that last win.
+    """
     origin_winner: str | None
     warming_switch: tuple[float, float] | None
     price_switch: tuple[float, float] | None
     wins_everywhere: bool
+    others_win_somewhere: bool
+    warming_tie_from: float | None = None
+    price_tie_from: float | None = None
 
 
 def season_margins(crops: Sequence[str], first_predecessor: str | None, track_yields: np.ndarray,
@@ -89,26 +97,40 @@ def grid_winner(p50_by_rotation: dict[str, float], near_tie_usd_ha: float) -> tu
     return ranked[0][0], False
 
 
-def _nearest_zero(values: Sequence[float]) -> int:
+def nearest_zero(values: Sequence[float]) -> int:
+    """Index of the value nearest 0 (the first one on a tie): the grid's anchor row or column."""
     return min(range(len(values)), key=lambda i: abs(values[i]))
+
+
+def _first_switch(line: list[str | None], values: Sequence[float], yours: str
+                  ) -> tuple[tuple[float, float] | None, float | None]:
+    """((last outright win, first win by another rotation), first tie after that win) along one line of cells.
+
+    `line[0]` is the anchor cell, won by yours. None (a near tie) is neither a win nor a switch.
+    """
+    last_win, tie_from = 0, None
+    for i in range(1, len(line)):
+        if line[i] == yours:
+            last_win, tie_from = i, None
+        elif line[i] is None:
+            tie_from = i if tie_from is None else tie_from
+        else:
+            return (values[last_win], values[i]), None if tie_from is None else values[tie_from]
+    return None, None
 
 
 def switch_points(winners: list[list[str | None]], warming_c: Sequence[float], price_pct: Sequence[float],
                   yours: str) -> SwitchPoints:
-    """Where `yours` stops earning most. Rows are warming levels, columns price changes. Near ties are skipped."""
-    r0, c0 = _nearest_zero(warming_c), _nearest_zero(price_pct)
+    """Where `yours` stops earning most: down the anchor column as it warms, left along the anchor row as
+    prices fall. Rows are warming levels, columns price changes."""
+    r0, c0 = nearest_zero(warming_c), nearest_zero(price_pct)
     origin = winners[r0][c0]
-    everywhere = all(w == yours for row in winners for w in row)
+    cells = [w for row in winners for w in row]
+    everywhere, others = all(w == yours for w in cells), any(w not in (None, yours) for w in cells)
     if origin != yours:
-        return SwitchPoints(origin, None, None, everywhere)
-    warming_switch = None
-    for r in range(r0 + 1, len(warming_c)):
-        if winners[r][c0] not in (None, yours):
-            warming_switch = (warming_c[r - 1], warming_c[r])
-            break
-    price_switch = None
-    for c in range(c0 - 1, -1, -1):
-        if winners[r0][c] not in (None, yours):
-            price_switch = (price_pct[c + 1], price_pct[c])
-            break
-    return SwitchPoints(origin, warming_switch, price_switch, everywhere)
+        return SwitchPoints(origin, None, None, everywhere, others)
+    column = [winners[r][c0] for r in range(r0, len(warming_c))]
+    warming_switch, warming_tie = _first_switch(column, list(warming_c[r0:]), yours)
+    row = [winners[r0][c] for c in range(c0, -1, -1)]
+    price_switch, price_tie = _first_switch(row, [price_pct[c] for c in range(c0, -1, -1)], yours)
+    return SwitchPoints(origin, warming_switch, price_switch, everywhere, others, warming_tie, price_tie)
