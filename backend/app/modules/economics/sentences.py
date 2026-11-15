@@ -50,8 +50,10 @@ def climate_bill(yours: str, label: str, change_p50: float, alt: str | None, win
 def bad_years(name: str, losing_share: float, worst: float, cushion_worst: float, units: str) -> str:
     if losing_share == 0:
         return f"{name} made money in every simulated season."
-    s = (f"{name} loses money in about {max(1, round(losing_share * 10))} of every 10 seasons; "
-         f"the worst season loses {money(worst, units)}.")
+    tenths = max(1, round(losing_share * 10))
+    how_often = ("in every simulated season" if losing_share == 1 else "in nearly every simulated season"
+                 if tenths == 10 else f"in about {tenths} of every 10 seasons")
+    s = f"{name} loses money {how_often}; the worst season loses {money(worst, units)}."
     if cushion_worst > 0:
         s += f" Getting through the worst run of seasons takes about {money(cushion_worst, units)} in cash."
     return s

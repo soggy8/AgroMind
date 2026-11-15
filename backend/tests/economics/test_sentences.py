@@ -44,6 +44,8 @@ def test_bad_years():
     assert got == ("Y loses money in about 4 of every 10 seasons; the worst season loses $410/ha. "
                    "Getting through the worst run of seasons takes about $600/ha in cash.")
     assert "about 1 of every 10" in s.bad_years("Y", 0.02, -10, 0, "metric")
+    assert "in nearly every simulated season" in s.bad_years("Y", 0.97, -10, 0, "metric")
+    assert "in every simulated season" in s.bad_years("Y", 1.0, -10, 0, "metric")
 
 
 def test_switch_cases():
