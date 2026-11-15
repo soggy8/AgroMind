@@ -129,14 +129,26 @@ def get_defaults(session: Session, farm_id: str, *, port=ports) -> EconomicsDefa
 
 # ---------- runs and margins ----------
 
+def _scenario_key(scenario: EconScenario) -> tuple:
+    """A run's identity within a report. With no warming the heat response changes nothing, so both share a key."""
+    d = scenario.model_dump()
+    if scenario.temp_delta_c == 0 and scenario.projection is None:
+        d["heat_response"] = "published"
+    return tuple(sorted(d.items()))
+
+
 def _run_cached(cache: dict, port, session: Session, farm_id: str, field_id: str,
                 rotations: list[RotationInput], scenario: EconScenario) -> ports.Run:
-    """port.run once per distinct scenario in a report: today's climate is often grid row 0 as well."""
-    key = (tuple(sorted(scenario.model_dump().items())),
-           tuple((r.id, r.name, tuple(r.crops), r.cover_crop) for r in rotations))
-    if key not in cache:
-        cache[key] = port.run(session, farm_id, field_id, rotations, scenario)
-    return cache[key]
+    """port.run once per distinct scenario in a report: today's climate is often grid row 0 as well.
+
+    A cached run holding every rotation asked for is reused: rotation ids are unique within a report, and
+    the Simulator simulates each rotation on its own, so a rotation's result doesn't depend on the others.
+    """
+    key = _scenario_key(scenario)
+    hit = cache.get(key)
+    if hit is None or not {r.id for r in rotations} <= hit.rotations.keys():
+        cache[key] = hit = port.run(session, farm_id, field_id, rotations, scenario)
+    return hit
 
 
 @dataclass(frozen=True)
@@ -147,9 +159,10 @@ class _Pricing:
     years: int
     price_crop: str | None
 
-    def seasons(self, run: ports.Run, price_change_pct: float) -> dict[str, np.ndarray]:
+    def seasons(self, run: ports.Run, price_change_pct: float,
+                rotations: list[RotationInput] | None = None) -> dict[str, np.ndarray]:
         out = {}
-        for r in self.rotations:
+        for r in rotations or self.rotations:
             rr = run.rotations[r.id]
             out[r.id] = money.season_margins(rr.season_crops, self.first_predecessor, rr.track_yields,
                                              rr.irrigation_mm_p50, r.cover_crop, self.m, price_change_pct,
@@ -321,24 +334,29 @@ def build_report(session: Session, farm_id: str, req: EconomicsRequest, *, port=
 
     cache: dict = {}
 
-    def run(**update) -> ports.Run:
-        return _run_cached(cache, port, session, farm_id, req.field_id, priced, sc.model_copy(update=update))
+    def run(rotations: list[RotationInput], **update) -> ports.Run:
+        return _run_cached(cache, port, session, farm_id, req.field_id, rotations, sc.model_copy(update=update))
 
+    has_grid = len(priced) >= 2
+    rain = max(-50.0, min(30.0, proj.rain_change_pct if proj else sc.rain_change_pct))  # the grid rows' rain
+    # Today and the other heat response are for yours only, unless today is also a grid row (then the grid reuses it).
+    today_rotations = priced if has_grid and rain == 0 and 0 in req.grid.warming_c else [yours]
     pricing, pct = _Pricing(m, priced, field.current_crop_id, sc.years, req.price_crop), req.price_change_pct
-    scen_run = run()
+    scen_run = run(priced)
     scen_seasons = pricing.seasons(scen_run, pct)
     scen = pricing.annual(scen_seasons)
-    today = pricing.annual(pricing.seasons(run(temp_delta_c=0.0, rain_change_pct=0.0, projection=None), pct))
-    other = pricing.annual(pricing.seasons(run(heat_response=_other_heat_response(sc.heat_response)), pct))
+    today_run = run(today_rotations, temp_delta_c=0.0, rain_change_pct=0.0, projection=None)
+    today = pricing.annual(pricing.seasons(today_run, pct, [yours]))
+    other = pricing.annual(pricing.seasons(run([yours], heat_response=_other_heat_response(sc.heat_response)), pct,
+                                           [yours]))
 
     bill = _climate_bill(req, yours, priced, field.area_ha, today, scen, other, label, _sources([yours], inputs))
     bad = [_bad_years(r, scen_seasons[r.id], sc.years, req.units, _sources([r], inputs)) for r in priced]
 
     grid = None
-    if len(priced) >= 2:
-        rain = max(-50.0, min(30.0, proj.rain_change_pct if proj else sc.rain_change_pct))
+    if has_grid:
         rain_source = "the projection's May-Sep median rain change" if proj else "the scenario's rain change"
-        rows = [run(temp_delta_c=w, rain_change_pct=rain, projection=None) for w in req.grid.warming_c]
+        rows = [run(priced, temp_delta_c=w, rain_change_pct=rain, projection=None) for w in req.grid.warming_c]
         grid = _grid(req, yours, pricing, rows, rain, rain_source, proj.temp_change_c if proj else sc.temp_delta_c,
                      _sources(priced, inputs, NEAR_TIE_SOURCE))
 

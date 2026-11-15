@@ -7,6 +7,7 @@ export type HeatResponse = "published" | "local";
 export type Land = "rent" | "own";
 
 export const MAX_ROTATIONS = 4;
+export const MAX_WARMING_ROWS = 5; // each grid row is one Simulator run (7 s report limit)
 
 // ---------- inputs ----------
 
@@ -29,15 +30,15 @@ export interface RotationInput {
 
 export interface YourNumbers {
   land: Land;
-  rent_usd_ha: number | null; // >= 0
-  prices_usd_t: Record<string, number>; // crop id -> USD per tonne, each > 0
-  costs_before_rent_usd_ha: Record<string, number>; // crop id -> USD per ha, each >= 0
-  irrigation_usd_per_mm_ha: number | null; // >= 0
-  cover_crop_usd_ha: number | null; // >= 0
+  rent_usd_ha: number | null; // 0 .. 20,000
+  prices_usd_t: Record<string, number>; // crop id -> USD per tonne, each > 0 and <= 10,000
+  costs_before_rent_usd_ha: Record<string, number>; // crop id -> USD per ha, each 0 .. 20,000
+  irrigation_usd_per_mm_ha: number | null; // 0 .. 100
+  cover_crop_usd_ha: number | null; // 0 .. 5,000
 }
 
 export interface GridSpec {
-  warming_c: number[]; // 2 .. 7 unique values in -1 .. 5, sorted ascending
+  warming_c: number[]; // 2 .. 5 unique values in -1 .. 5, sorted ascending
   price_change_pct: number[]; // 2 .. 9 unique values in -40 .. 40, sorted ascending
 }
 

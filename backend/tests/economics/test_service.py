@@ -202,6 +202,41 @@ def test_identical_runs_are_reused():
     report(port)  # +2 °C, rain 0: today is grid row 0 and the scenario is grid row 2
     keys = [(sc.temp_delta_c, sc.rain_change_pct, sc.projection, sc.heat_response) for sc, _ in port.calls]
     assert len(keys) == len(set(keys)) == 6  # today, scenario, other, rows +1, +3, +4
+    ids = {(sc.temp_delta_c, sc.heat_response): ids for sc, ids in port.calls}
+    assert ids[(0.0, "published")] == ["B", "S", "A"]  # today doubles as grid row 0, so it prices every rotation
+    assert ids[(2.0, "local")] == ["B"]
+
+
+class WidePort(FakePort):
+    """Simulates every rotation it was built with on each run, whatever it is asked for."""
+    def __init__(self, rotations):
+        super().__init__()
+        self.all = rotations
+
+    def run(self, session, farm_id, field_id, rotations, scenario, include_economics=False):
+        return super().run(session, farm_id, field_id, self.all, scenario, include_economics)
+
+
+def test_today_and_other_heat_response_run_yours_only():
+    dry = EconScenario(temp_delta_c=2, rain_change_pct=-20, years=2)  # grid rows have -20 % rain, so today is none
+    port = FakePort()
+    rep = report(port, scenario=dry)
+    today = [ids for sc, ids in port.calls if sc.temp_delta_c == 0 and sc.rain_change_pct == 0]
+    other = [ids for sc, ids in port.calls if sc.heat_response == "local"]
+    assert today == [["B"]] and other == [["B"]]
+    assert len(port.calls) == 7  # scenario (= grid row +2), today, other, rows 0, +1, +3, +4
+    # rotations are simulated independently: running every rotation in those runs gives the same bill
+    assert rep.climate_bill == report(WidePort([MS, SS, MM]), scenario=dry).climate_bill
+
+
+def test_heat_response_is_ignored_when_nothing_warms():
+    port = FakePort()
+    report(port, scenario=EconScenario(rain_change_pct=-20, years=2, heat_response="local"))
+    assert {sc.heat_response for sc, _ in port.calls} == {"local"}  # the other heat response reuses the scenario
+    assert len(port.calls) == 6  # scenario (= grid row 0), today, rows +1 to +4
+    port = FakePort()
+    report(port, scenario=EconScenario(years=2))  # today's climate: scenario, today, other and grid row 0 are one
+    assert len(port.calls) == 5
 
 
 def test_grid_matches_climate_bill_and_applies_prices():
