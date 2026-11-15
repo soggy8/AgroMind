@@ -445,7 +445,7 @@ function GridBlock({ grid, rotations, colorOf, u }: { grid: WhoEarnsMost; rotati
   return (
     <Glass as="section" className="p-5" aria-labelledby="grid-h">
       <BlockHead id="grid-h" n={3} title={t("Who earns most?")} kind="modelled"
-        sub={t("Rows: warming. Columns: change in all crop prices. Rain: {v}% ({source}).", { v: grid.rain_change_pct.toFixed(0), source: t(grid.rain_change_source) })} />
+        sub={t("Rows: warming. Columns: change in all crop prices. Rain: {v}% ({source}).", { v: grid.rain_change_pct.toFixed(0), source: grid.rain_change_source })} />
       <p className="mb-3 max-w-[70ch] text-[15px] leading-normal">{grid.sentence}</p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[480px] border-separate border-spacing-1 text-[13px]">
@@ -503,7 +503,7 @@ function InputsBlock({ report }: { report: EconomicsReport }) {
             <span className="font-semibold">{i.label}</span>
             <span className="text-right">
               <b>{i.display}</b>
-              <span className={`block max-w-[52ch] text-[12px] leading-snug ${i.source === "Your number" ? "text-lime" : "text-mut"}`}>{i.source}</span>
+              <span className={`block max-w-[52ch] text-[12px] leading-snug ${i.source === "Your number" ? "text-lime" : "text-mut"}`}>{i.source === "Your number" ? t("Your number") : i.source}</span>
             </span>
           </li>
         ))}

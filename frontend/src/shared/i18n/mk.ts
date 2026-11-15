@@ -5,8 +5,9 @@
 import { APP } from "./mk/app";
 import { CROPDOCTOR } from "./mk/cropdoctor";
 import { CROPTWIN } from "./mk/croptwin";
+import { ECONOMICS } from "./mk/economics";
 import { EXTRA } from "./mk/extra";
 import { SHARED } from "./mk/shared";
 import { SIMULATOR } from "./mk/simulator";
 
-export const MK: Record<string, string> = { ...SHARED, ...APP, ...CROPTWIN, ...CROPDOCTOR, ...SIMULATOR, ...EXTRA };
+export const MK: Record<string, string> = { ...SHARED, ...APP, ...CROPTWIN, ...CROPDOCTOR, ...SIMULATOR, ...ECONOMICS, ...EXTRA };

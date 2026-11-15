@@ -11,7 +11,7 @@ async function open(page: Page) {
 test("farm money opens with a report on the defaults, every block labelled", async ({ page }) => {
   const errors = await open(page);
   const bill = page.getByRole("region", { name: "The climate bill" });
-  await expect(bill.getByText("modelled", { exact: true })).toBeVisible();
+  await expect(bill.getByText(/^modelled$/i)).toBeVisible();
   await expect(bill.getByText(/than in today's climate|the same as in today's climate/)).toBeVisible();
   await expect(page.getByRole("region", { name: "Bad-year money" }).getByText("Seasons that lose money")).toBeVisible();
   const grid = page.getByRole("region", { name: "Who earns most?" });

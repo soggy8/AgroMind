@@ -20,6 +20,7 @@ from app.shared.advisor.router import router as advisor_router
 from app.modules.assistant import i18n_mk as assistant_mk
 from app.modules.cropdoctor import i18n_mk as cropdoctor_mk
 from app.modules.croptwin import i18n_mk as croptwin_mk
+from app.modules.economics import i18n_mk as economics_mk
 from app.modules.simulator import i18n_mk as simulator_mk
 from app.shared import i18n
 from app.shared import i18n_mk as shared_mk
@@ -32,7 +33,7 @@ def create_app() -> FastAPI:
 
     # Sentences in responses follow the browser's Accept-Language (English or Macedonian); see app/shared/i18n.py.
     i18n.register("mk", {**shared_mk.CATALOG, **croptwin_mk.CATALOG, **cropdoctor_mk.CATALOG, **simulator_mk.CATALOG,
-                         **assistant_mk.CATALOG})
+                         **economics_mk.CATALOG, **assistant_mk.CATALOG})
     app.add_middleware(i18n.TranslateResponses)
     app.add_middleware(
         CORSMiddleware,

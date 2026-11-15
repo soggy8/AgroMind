@@ -5,7 +5,7 @@ backend module that puts the Simulator's results into money.
 
 **Status (2026-11-15): built, backend and a first screen.** Owner: Kiril (backend design), andrej
 (the screen). API at `/api/farms/{farm_id}/economics`; page at `#/economics` ("Farm money" in the top
-bar). 48 backend tests (`backend/tests/economics/`), 2 Playwright tests (`frontend/e2e/economics.spec.ts`).
+bar). 53 backend tests (`backend/tests/economics/`), 2 Playwright tests (`frontend/e2e/economics.spec.ts`).
 A report with the default 5 x 5 grid takes about 2.2 s after the Simulator has warmed up (limit: 7 s).
 See section 15 for what changed during the build.
 
@@ -364,9 +364,12 @@ What changed from the plan while building:
   prices and costs in $/bu and $/ac (US units) or $/t and $/ha (metric). Results: the climate bill,
   bad-year money, the who-earns-most grid (cells name the winner, so colour is never the only signal; your
   cell outlined), and every number used with its source. It reads fields and projections from
-  `simulatorApi.getOptions` and the rotation colours from the Simulator's `rotationColors`. The page's
-  English strings go through `t()` but have no Macedonian entries yet, and the backend's economics
-  sentences aren't translated.
+  `simulatorApi.getOptions` and the rotation colours from the Simulator's `rotationColors`. English and
+  Macedonian: page strings in `frontend/src/shared/i18n/mk/economics.ts`, the backend's sentences in
+  `economics/i18n_mk.py` (registered in `main.py`; `tests/economics/test_i18n_mk.py` fails on English left
+  in a Macedonian report). The source value `"Your number"` stays English in the API because the page
+  compares it; the page translates it where it's shown. Translations are the developer's, like the rest
+  of the site: have a native speaker review them (`docs/i18n.md`).
 - With the demo field and the default NASA 2050s middle-emissions projection, Maize → Soybean's margin
   falls from about $86/ha to about −$467/ha a year under the US-research heat response, and by about
   $132/ha with this county's heat response. The gap between those two is the model's main uncertainty;
