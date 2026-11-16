@@ -21,7 +21,7 @@ export function DateControl({ health, onPick }: { health: FarmHealth; onPick: (d
   const onToday = health.as_of === health.today;
   const tone = (on: boolean) => (on ? "border-line bg-glass-sel text-tx" : "border-transparent text-mut hover:bg-glass-hi hover:text-tx");
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       {health.replay_date && (
         <button type="button" aria-pressed={onReplay} onClick={() => onPick(health.replay_date!)} className={`${quick} ${tone(onReplay)}`}>
           {t("2012 drought")}

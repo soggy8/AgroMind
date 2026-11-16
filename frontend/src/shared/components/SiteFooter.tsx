@@ -19,8 +19,9 @@ export function PoweredBy() {
 }
 
 /**
- * The footer of the scrolling pages (landing, Overview): the project is free and open source, the AI runs on a free
- * API key (so it can be slow under load), and the Powered by ESTADA credit. `children` adds page notes above.
+ * The footer of the scrolling pages (landing, Overview): who made it, that the project is free and open source, that
+ * the AI runs on a free API key (so it can be slow under load), and the Powered by ESTADA credit. `children` adds
+ * page notes above.
  */
 export function SiteFooter({ children, lead }: { children?: ReactNode; lead?: ReactNode }) {
   return (
@@ -28,6 +29,7 @@ export function SiteFooter({ children, lead }: { children?: ReactNode; lead?: Re
       <div className="mx-auto grid max-w-[1240px] gap-6 px-5 py-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:gap-10 lg:px-8">
         <div className="space-y-3 text-[13px] leading-relaxed text-mut">
           {lead}
+          <p>{t("Made by Andrej Trendov, Kire Angelov and Kiril Cvetkov.")}</p>
           <p>
             {t("AgroMind is a free, open-source project.")}{" "}
             <a href={REPO} target="_blank" rel="noopener"

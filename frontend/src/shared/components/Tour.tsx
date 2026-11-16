@@ -42,20 +42,47 @@ export function Tour({ id, steps, onClose }: { id: string; steps: TourStep[]; on
     if (!step) return;
     const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
     el?.scrollIntoView({ block: "nearest" });
+    // Freeze the page where that step landed. A scroll moves the page and leaves the outline behind.
+    const y = window.scrollY;
+    const body = document.body;
+    body.style.position = "fixed";
+    body.style.top = `-${y}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
     const update = () => setRect(el?.getBoundingClientRect() ?? null);
     update();
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.right = "";
+      body.style.width = "";
+      window.scrollTo(0, y);
+    };
   }, [step]);
 
   useEffect(() => {
+    const blockScroll = (e: Event) => e.preventDefault();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") finish();
-      if (e.key === "ArrowRight") setI((x) => Math.min(x + 1, available.length - 1));
-      if (e.key === "ArrowLeft") setI((x) => Math.max(x - 1, 0));
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        setI((x) => e.key === "ArrowRight" ? Math.min(x + 1, available.length - 1) : Math.max(x - 1, 0));
+      }
+      if (e.key === "PageDown" || e.key === "PageUp" || e.key === "Home" || e.key === "End") e.preventDefault();
+      if (e.key === " " && !(e.target instanceof HTMLButtonElement)) e.preventDefault();
     };
+    window.addEventListener("wheel", blockScroll, { passive: false });
+    window.addEventListener("touchmove", blockScroll, { passive: false });
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("wheel", blockScroll);
+      window.removeEventListener("touchmove", blockScroll);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [finish, available.length]);
 
   if (!step || !rect) return null;

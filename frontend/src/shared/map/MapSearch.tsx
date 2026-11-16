@@ -147,7 +147,9 @@ export function MapSearch({ local, searchPlaces, onPick, style }: {
                 const Icon = ICON[r.kind];
                 return (
                   <li key={`${r.kind}-${r.id}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}
-                    onMouseDown={(e) => { e.preventDefault(); choose(r); }} onMouseEnter={() => setActive(i)}
+                    // pointerdown, not click: the map stops mousedown/click from leaving this box, so a click
+                    // never reached the result and the map stayed put.
+                    onPointerDown={(e) => { e.preventDefault(); choose(r); }} onMouseEnter={() => setActive(i)}
                     className={`flex min-h-11 cursor-pointer items-start gap-2 rounded-[10px] px-2.5 py-2 ${i === active ? "bg-glass-sel" : ""}`}>
                     <Icon size={15} strokeWidth={1.75} className="mt-0.5 shrink-0 text-mut" />
                     <span className="min-w-0">

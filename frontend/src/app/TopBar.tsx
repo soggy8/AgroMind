@@ -11,12 +11,12 @@ import { getLang, t, tn } from "../shared/i18n";
 
 function Logo() {
   return (
-    <a href="#/" aria-label={t("AgroMind home")} className="flex items-center gap-[9px] text-[19px] font-extrabold tracking-[-.01em] text-tx">
+    <a href="#/" aria-label={t("AgroMind home")} className="flex shrink-0 items-center gap-[9px] text-[19px] font-extrabold tracking-[-.01em] text-tx">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path d="M12 21c0-7 3-12 9-15-1 8-4 13-9 15Z" fill="var(--color-lime)" />
         <path d="M12 21C12 15 9.5 10.5 3 8c.6 7 3.6 11.4 9 13Z" fill="var(--color-rain)" />
       </svg>
-      {t("AgroMind")}
+      <span className="max-sm:sr-only">{t("AgroMind")}</span>
     </a>
   );
 }
@@ -178,7 +178,7 @@ export function TopBar({ route, onNavigate, status, actions, onHelp, onAdvisor, 
   };
 
   return (
-    <header className="glass relative z-20 mx-4 mt-4 flex h-[60px] items-center gap-2 !rounded-bar pl-4 pr-2.5 lg:mx-5 lg:gap-3 lg:pl-5">
+    <header className="glass relative z-20 mx-4 mt-4 flex h-[60px] min-w-0 items-center gap-2 !rounded-bar pl-4 pr-2.5 lg:mx-5 lg:gap-3 lg:pl-5">
       <Logo />
       {farm && (
         <details ref={switcher.ref} className="relative hidden sm:block">
@@ -196,20 +196,20 @@ export function TopBar({ route, onNavigate, status, actions, onHelp, onAdvisor, 
       <nav className="mx-auto hidden md:block" aria-label={t("Main")}>
         <SegmentedTabs label={t("Main navigation")} items={ROUTES} value={route === "home" ? "command-center" : route} onChange={onNavigate} />
       </nav>
-      <div className="ml-auto flex items-center gap-2 md:ml-0">
-        {status}
+      <div className="ml-auto flex min-w-0 items-center gap-2 md:ml-0">
+        {status && <div className="shrink-0">{status}</div>}
         {actions && <div className="hidden items-center gap-2 lg:flex">{actions}</div>}
         {/* Language: tabs on very wide screens; from 768 px in the language-and-units popover; on phones in the menu. */}
         <LanguageTabs className="hidden 2xl:flex" />
         <UnitsToggle className="hidden 2xl:flex" />
         {onHelp && (
           <button type="button" onClick={onHelp} aria-label={t("Take the tour")} title={t("Take the tour")}
-            className="grid h-10 w-10 place-items-center rounded-ctl text-mut hover:bg-glass-hi hover:text-tx">
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-ctl text-mut hover:bg-glass-hi hover:text-tx">
             <CircleHelp size={18} strokeWidth={1.75} />
           </button>
         )}
         {openAdvisor && (
-          <Button onClick={openAdvisor} aria-label={t("Ask the advisor")} title={t("Ask the advisor (Ctrl+K)")} data-tour="advisor" className="max-sm:h-11 max-sm:w-11 max-sm:!px-0">
+          <Button onClick={openAdvisor} aria-label={t("Ask the advisor")} title={t("Ask the advisor (Ctrl+K)")} data-tour="advisor" className="shrink-0 max-sm:h-11 max-sm:w-11 max-sm:!px-0">
             <MessageSquareText size={16} strokeWidth={1.75} />
             {/* The label shows where the bar has room for it; the icon and Ctrl+K work everywhere. */}
             <span className="hidden whitespace-nowrap 2xl:inline">{t("Ask the advisor")}</span>
@@ -231,11 +231,11 @@ export function TopBar({ route, onNavigate, status, actions, onHelp, onAdvisor, 
         </details>
         <div className="hidden md:block"><Account /></div>
       </div>
-      <details ref={menu.ref} className="relative md:hidden">
+      <details ref={menu.ref} className="relative shrink-0 md:hidden">
         <summary className="grid h-11 w-11 cursor-pointer list-none place-items-center rounded-ctl border border-line bg-glass-hi [&::-webkit-details-marker]:hidden" aria-label={t("Menu")}>
           <Menu size={18} strokeWidth={1.75} />
         </summary>
-        <div className="glass absolute right-0 top-14 z-30 max-h-[calc(100svh-90px)] w-72 overflow-y-auto p-1.5">
+        <div className="glass !bg-ground absolute right-0 top-14 z-30 max-h-[calc(100svh-90px)] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto p-1.5">
           <nav aria-label={t("Main")}>
             {ROUTES.map((r) => (
               <button key={r.id} type="button" onClick={() => { menu.close(); onNavigate(r.id); }}
@@ -249,13 +249,15 @@ export function TopBar({ route, onNavigate, status, actions, onHelp, onAdvisor, 
             <FarmList onPick={pick} onManage={manage} />
           </div>
           <MenuAccount onDone={menu.close} />
-          <div className="mt-1 flex items-center justify-between border-t border-line px-3 pb-1 pt-2.5">
-            <span className="text-[12px] font-semibold uppercase tracking-[.06em] text-mut">{t("Units")}</span>
-            <UnitsToggle />
-          </div>
-          <div className="flex items-center justify-between px-3 pb-1 pt-2">
-            <span className="text-[12px] font-semibold uppercase tracking-[.06em] text-mut">{t("Language")}</span>
-            <LanguageTabs />
+          <div className="mt-1 space-y-2.5 border-t border-line px-3 py-2.5">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[.06em] text-mut">{t("Units")}</p>
+              <UnitsToggle className="mt-1 w-full" />
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[.06em] text-mut">{t("Language")}</p>
+              <LanguageTabs className="mt-1 w-full" />
+            </div>
           </div>
         </div>
       </details>

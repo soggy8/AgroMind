@@ -57,6 +57,7 @@ export const EXTRA: Record<string, string> = {
   "county heat": "топлина според округот",
   "{n} yr": "{n} год.",
   "none": "нема",
+  "Made by Andrej Trendov, Kire Angelov and Kiril Cvetkov.": "Направено од Andrej Trendov, Kire Angelov и Kiril Cvetkov.",
   "Powered by": "Изработено од",
   "Powered by ESTADA": "Изработено од ESTADA",
   "AgroMind is a free, open-source project.": "AgroMind е бесплатен проект со отворен код.",

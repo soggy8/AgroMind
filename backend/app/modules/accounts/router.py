@@ -14,9 +14,17 @@ router = APIRouter(prefix="/api/auth", tags=["accounts"])
 DB = Depends(get_session)
 
 
+def _cookie_flags() -> dict:
+    """Same flags on the way in and the way out, or a Secure cookie never gets cleared."""
+    return {"httponly": True, "samesite": "lax", "secure": get_settings().environment == "production", "path": "/"}
+
+
 def _set_cookie(response: Response, token: str) -> None:
-    response.set_cookie(service.COOKIE, token, max_age=service.SESSION_DAYS * 86400, httponly=True, samesite="lax",
-                        secure=get_settings().environment == "production", path="/")
+    response.set_cookie(service.COOKIE, token, max_age=service.SESSION_DAYS * 86400, **_cookie_flags())
+
+
+def _clear_cookie(response: Response) -> None:
+    response.delete_cookie(service.COOKIE, **_cookie_flags())
 
 
 def _client(request: Request) -> str | None:
@@ -69,7 +77,7 @@ def login(body: Credentials, request: Request, response: Response, session: Sess
 def logout(request: Request, session: Session = DB):
     service.sign_out(session, request.cookies.get(service.COOKIE))
     response = Response(status_code=204)
-    response.delete_cookie(service.COOKIE, path="/")
+    _clear_cookie(response)
     return response
 
 

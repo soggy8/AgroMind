@@ -70,7 +70,6 @@ export function CommandCenterPage({ farmId, route, onNavigate }: { farmId: strin
   const topBar = (
     <TopBar route={route} onNavigate={onNavigate}
       status={n > 0 && <StatusPill tone="watch">{trn(n, "1 finding", "{n} findings")}</StatusPill>}
-      actions={health && desktop && <div data-tour="cc-date" data-assist="cc.date"><DateControl health={health} onPick={setAsOf} /></div>}
       onHelp={() => { if (!desktop) setTab("fields"); setTouring(true); }} />
   );
 
@@ -150,7 +149,12 @@ export function CommandCenterPage({ farmId, route, onNavigate }: { farmId: strin
           <div className="absolute bottom-5 left-[390px] right-[450px] z-10 flex justify-end">{sourcePill}</div>
         </main>
         <div className="absolute inset-x-0 top-0 z-20">{topBar}</div>
-        <Glass as="aside" aria-label={tr("Fields")} data-tour="cc-fields" className="anim-in absolute bottom-5 left-5 top-[94px] z-10 w-[350px] overflow-hidden">
+        <Glass as="aside" aria-label={tr("Fields")} data-tour="cc-fields" className="anim-in absolute bottom-5 left-5 top-[94px] z-10 flex w-[350px] flex-col overflow-hidden">
+          {health && (
+            <div data-tour="cc-date" data-assist="cc.date" className="border-b border-line px-3 py-2.5">
+              <DateControl health={health} onPick={setAsOf} />
+            </div>
+          )}
           {fieldsPanel}
         </Glass>
         <Glass as="aside" aria-label={tr("Field status")} data-tour="cc-status" className="anim-in absolute bottom-5 right-5 top-[94px] z-10 w-[410px] overflow-hidden">

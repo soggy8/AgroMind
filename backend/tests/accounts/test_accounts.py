@@ -34,6 +34,18 @@ def test_signup_signs_in_and_logout_signs_out(anon_client):
     assert anon_client.get("/api/auth/me").json() is None
 
 
+def test_logout_clears_the_secure_cookie_in_production(anon_client, monkeypatch):
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "environment", "production")
+    signed = anon_client.post("/api/auth/signup", json={"email": "ana@example.com", "password": "long enough"})
+    assert "Secure" in signed.headers["set-cookie"]
+    out = anon_client.post("/api/auth/logout")
+    assert out.status_code == 204
+    cleared = out.headers["set-cookie"].lower()
+    assert "agromind_session=" in cleared and "secure" in cleared and "max-age=0" in cleared
+    assert anon_client.get("/api/auth/me").json() is None
+
+
 def test_login_checks_the_password(anon_client):
     anon_client.post("/api/auth/signup", json={"email": "ana@example.com", "password": "long enough"})
     anon_client.post("/api/auth/logout")

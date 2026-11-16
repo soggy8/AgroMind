@@ -86,7 +86,7 @@ export function FieldsPanel({ health, fieldId, onSelect }: { health: FarmHealth;
   const u = useUnits();
   const total = health.fields.reduce((s, f) => s + f.area_ha, 0);
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-baseline justify-between px-[18px] pb-3 pt-[18px]">
         <h2 className="text-[16px] font-bold">{t("Fields")}</h2>
         <span className="text-[13px] text-mut">
