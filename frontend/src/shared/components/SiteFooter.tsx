@@ -4,32 +4,22 @@ import { t } from "../i18n";
 
 const REPO = "https://github.com/soggy8/AgroMind";
 
-/** "Powered by ESTADA": the studio's mark, linking to estada.dev (same mark as the blabla-cafe site). */
-export function PoweredBy() {
-  return (
-    <a href="https://estada.dev" target="_blank" rel="noopener" aria-label={t("Powered by ESTADA")}
-      className="group inline-flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[.16em] text-mut transition-colors hover:text-tx focus-visible:text-tx">
-      <span>{t("Powered by")}</span>
-      <span className="flex items-center gap-2.5 transition duration-200 group-hover:-translate-y-0.5 group-hover:brightness-125 group-focus-visible:-translate-y-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
-        <img src="/estada-icon.svg" alt="" width={237} height={226} className="h-auto w-[26px]" />
-        <img src="/estada-logo.svg" alt="" width={151} height={21} className="h-auto w-[130px]" />
-      </span>
-    </a>
-  );
-}
-
 /**
- * The footer of the scrolling pages (landing, Overview): who made it, that the project is free and open source, that
- * the AI runs on a free API key (so it can be slow under load), and the Powered by ESTADA credit. `children` adds
- * page notes above.
+ * The footer of the scrolling pages (landing, Overview): who made it, that the project is free and open source, and
+ * that the AI runs on a free API key (so it can be slow under load). `children` adds page notes below.
  */
 export function SiteFooter({ children, lead }: { children?: ReactNode; lead?: ReactNode }) {
   return (
     <footer className="border-t border-line">
-      <div className="mx-auto grid max-w-[1240px] gap-6 px-5 py-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:gap-10 lg:px-8">
-        <div className="space-y-3 text-[13px] leading-relaxed text-mut">
-          {lead}
-          <p>{t("Made by Andrej Trendov, Kire Angelov and Kiril Cvetkov.")}</p>
+      <div className="mx-auto max-w-[1240px] space-y-8 px-5 py-12 lg:px-8">
+        {lead}
+        <div>
+          <p className="text-[13px] font-bold uppercase tracking-[.14em] text-lime">{t("Made by")}</p>
+          <p className="mt-2 text-[clamp(1.75rem,5vw,2.75rem)] font-extrabold leading-[1.05] tracking-[-.03em] text-tx">
+            <a href="https://estada.dev" target="_blank" rel="noopener" className="underline decoration-line/80 decoration-1 underline-offset-[6px] transition-colors hover:text-lime hover:decoration-lime">Andrej Trendov</a><br />Kire Angelov<br />Kiril Cvetkov
+          </p>
+        </div>
+        <div className="max-w-[62ch] space-y-3 text-[13px] leading-relaxed text-mut">
           <p>
             {t("AgroMind is a free, open-source project.")}{" "}
             <a href={REPO} target="_blank" rel="noopener"
@@ -42,7 +32,6 @@ export function SiteFooter({ children, lead }: { children?: ReactNode; lead?: Re
           </p>
           {children}
         </div>
-        <PoweredBy />
       </div>
     </footer>
   );
